@@ -2766,6 +2766,24 @@ class ClaudeRelayService {
                     }
                   }
 
+                  // 检测 tool_use content block，发射遥测
+                  if (
+                    data.type === 'content_block_start' &&
+                    data.content_block &&
+                    data.content_block.type === 'tool_use' &&
+                    data.content_block.name
+                  ) {
+                    if (config.simulation?.telemetryEnabled !== false) {
+                      const telemetrySimulator = require('../simulation/telemetrySimulator')
+                      telemetrySimulator
+                        .emitToolUse(accountId, accessToken, {
+                          model: requestedModel,
+                          toolName: data.content_block.name
+                        })
+                        .catch(() => {})
+                    }
+                  }
+
                   // 检查是否有限流错误
                   if (
                     data.type === 'error' &&
