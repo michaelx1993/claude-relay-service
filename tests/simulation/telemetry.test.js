@@ -144,4 +144,34 @@ describe('Telemetry Simulator', () => {
       expect(headers.Authorization).toBe('Bearer my-secret-token')
     })
   })
+
+  describe('emitToolUse / emitToolUseError', () => {
+    it('should send tengu_tool_use_success event', async () => {
+      await telemetrySimulator.emitToolUse('account-1', 'token-1', {
+        model: 'claude-sonnet-4-20250514',
+        toolName: 'Read'
+      })
+      await new Promise((r) => setTimeout(r, 50))
+
+      const event = sidecarClient.sendTelemetry.mock.calls[0][0].body.events[0]
+      expect(event.event_data.event_name).toBe('tengu_tool_use_success')
+      const meta = JSON.parse(event.event_data.additional_metadata)
+      expect(meta.tool_name).toBe('Read')
+    })
+
+    it('should send tengu_tool_use_error event', async () => {
+      await telemetrySimulator.emitToolUseError('account-1', 'token-1', {
+        model: 'claude-sonnet-4-20250514',
+        toolName: 'Bash',
+        errorType: 'permission_denied'
+      })
+      await new Promise((r) => setTimeout(r, 50))
+
+      const event = sidecarClient.sendTelemetry.mock.calls[0][0].body.events[0]
+      expect(event.event_data.event_name).toBe('tengu_tool_use_error')
+      const meta = JSON.parse(event.event_data.additional_metadata)
+      expect(meta.tool_name).toBe('Bash')
+      expect(meta.error_type).toBe('permission_denied')
+    })
+  })
 })

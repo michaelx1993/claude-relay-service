@@ -115,14 +115,50 @@ function filterForGemini(headers) {
 }
 
 /**
+ * 根据模型动态调整 beta flags
+ * 与 2.1.88-src/src/utils/betas.ts getAllModelBetas() 一致：
+ * - haiku 不带 claude-code-20250219
+ * - 非 ISP 模型不带 interleaved-thinking / redact-thinking
+ * - structured-outputs 仅 sonnet/opus 且需 experiment
+ */
+function getModelBetas(profileBetas, modelId) {
+  if (!Array.isArray(profileBetas)) return profileBetas
+
+  const model = (modelId || '').toLowerCase()
+  const isHaiku = model.includes('haiku')
+
+  // haiku: 排除 claude-code beta（CLI 源码: 仅非 haiku 添加）
+  let betas = isHaiku
+    ? profileBetas.filter((b) => b !== 'claude-code-20250219')
+    : [...profileBetas]
+
+  // structured-outputs: 仅对 sonnet/opus 启用，haiku 不支持
+  if (isHaiku) {
+    betas = betas.filter((b) => b !== 'structured-outputs-2025-12-15')
+  }
+
+  return betas
+}
+
+/**
  * 为 Claude Code 模拟模式构建完整 headers
  * 完全替换客户端 headers，使用 profile 定义的精确顺序和值
+ *
+ * @param {string} accountId
+ * @param {object} profile - 版本 profile
+ * @param {string} sessionId
+ * @param {string} token
+ * @param {object} [options]
+ * @param {string} [options.model] - 模型ID，用于动态调整 betas
  */
-function buildSimulatedHeaders(accountId, profile, sessionId, token) {
+function buildSimulatedHeaders(accountId, profile, sessionId, token, options = {}) {
   const { randomUUID } = require('crypto')
 
   const stainless = profile.stainless || {}
   const order = profile.header_order || []
+
+  // 根据模型动态调整 betas
+  const betas = getModelBetas(profile.beta_flags, options.model)
 
   // 预定义所有 header 值
   const headerValues = {
@@ -131,9 +167,7 @@ function buildSimulatedHeaders(accountId, profile, sessionId, token) {
     'X-Claude-Code-Session-Id': sessionId,
     'x-client-request-id': randomUUID(),
     'anthropic-version': profile.api_version,
-    'anthropic-beta': Array.isArray(profile.beta_flags)
-      ? profile.beta_flags.join(',')
-      : profile.beta_flags,
+    'anthropic-beta': Array.isArray(betas) ? betas.join(',') : betas,
     Authorization: `Bearer ${token}`,
     'Content-Type': 'application/json',
     'x-stainless-lang': stainless.lang || 'js',
@@ -160,5 +194,6 @@ module.exports = {
   filterForOpenAI,
   filterForClaude,
   filterForGemini,
-  buildSimulatedHeaders
+  buildSimulatedHeaders,
+  getModelBetas
 }

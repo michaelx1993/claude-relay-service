@@ -40,7 +40,7 @@ const {
   buildAttributionHeader
 } = require('../../src/utils/fingerprintHelper')
 const deviceIdentityService = require('../../src/utils/deviceIdentityService')
-const { buildSimulatedHeaders } = require('../../src/utils/headerFilter')
+const { buildSimulatedHeaders, getModelBetas } = require('../../src/utils/headerFilter')
 const redis = require('../../src/models/redis')
 const path = require('path')
 
@@ -723,6 +723,73 @@ describe('CLI Conformance Tests', () => {
       const headerStr = JSON.stringify(headers)
       const tokenOccurrences = headerStr.split('secret-token').length - 1
       expect(tokenOccurrences).toBe(1) // 只在 Authorization 中出现一次
+    })
+  })
+
+  // =========================================================================
+  // 12. 动态 Beta Headers（对照 betas.ts getAllModelBetas）
+  // =========================================================================
+  describe('Dynamic Model Betas (vs betas.ts getAllModelBetas)', () => {
+    const profile = require('../../src/services/simulation/profiles/2.1.88.json')
+
+    it('should exclude claude-code-20250219 for haiku models', () => {
+      const betas = getModelBetas(profile.beta_flags, 'claude-haiku-4-5-20251001')
+      expect(betas).not.toContain('claude-code-20250219')
+    })
+
+    it('should include claude-code-20250219 for sonnet models', () => {
+      const betas = getModelBetas(profile.beta_flags, 'claude-sonnet-4-20250514')
+      expect(betas).toContain('claude-code-20250219')
+    })
+
+    it('should include claude-code-20250219 for opus models', () => {
+      const betas = getModelBetas(profile.beta_flags, 'claude-opus-4-20250514')
+      expect(betas).toContain('claude-code-20250219')
+    })
+
+    it('should exclude structured-outputs for haiku', () => {
+      const betas = getModelBetas(profile.beta_flags, 'claude-haiku-4-5-20251001')
+      expect(betas).not.toContain('structured-outputs-2025-12-15')
+    })
+
+    it('should include structured-outputs for sonnet/opus', () => {
+      const betas = getModelBetas(profile.beta_flags, 'claude-sonnet-4-20250514')
+      expect(betas).toContain('structured-outputs-2025-12-15')
+    })
+
+    it('should always include oauth beta regardless of model', () => {
+      const haikuBetas = getModelBetas(profile.beta_flags, 'claude-haiku-4-5-20251001')
+      const sonnetBetas = getModelBetas(profile.beta_flags, 'claude-sonnet-4-20250514')
+      expect(haikuBetas).toContain('oauth-2025-04-20')
+      expect(sonnetBetas).toContain('oauth-2025-04-20')
+    })
+
+    it('should always include interleaved-thinking regardless of model', () => {
+      const haikuBetas = getModelBetas(profile.beta_flags, 'claude-haiku-4-5-20251001')
+      expect(haikuBetas).toContain('interleaved-thinking-2025-05-14')
+    })
+
+    it('should pass through non-array beta_flags unchanged', () => {
+      const result = getModelBetas('some-string', 'claude-sonnet-4-20250514')
+      expect(result).toBe('some-string')
+    })
+
+    it('should build headers with model-specific betas for haiku', () => {
+      const headers = buildSimulatedHeaders('acc', profile, 'sess', 'tok', {
+        model: 'claude-haiku-4-5-20251001'
+      })
+      const betaStr = headers['anthropic-beta']
+      expect(betaStr).not.toContain('claude-code-20250219')
+      expect(betaStr).toContain('oauth-2025-04-20')
+    })
+
+    it('should build headers with full betas for sonnet', () => {
+      const headers = buildSimulatedHeaders('acc', profile, 'sess', 'tok', {
+        model: 'claude-sonnet-4-20250514'
+      })
+      const betaStr = headers['anthropic-beta']
+      expect(betaStr).toContain('claude-code-20250219')
+      expect(betaStr).toContain('oauth-2025-04-20')
     })
   })
 })

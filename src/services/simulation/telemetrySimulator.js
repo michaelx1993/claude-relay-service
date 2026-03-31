@@ -242,10 +242,64 @@ async function emitExit(accountId, accessToken) {
   }
 }
 
+/**
+ * 发射 tool_use 成功事件（响应中包含 tool_use 时调用）
+ * 对照 CLI: tengu_tool_use_success
+ */
+async function emitToolUse(accountId, accessToken, options = {}) {
+  const { model, toolName, durationMs } = options
+
+  try {
+    const ps = getProfileService()
+    const profile = await ps.getActiveProfile()
+
+    const event = await buildEvent(accountId, 'tengu_tool_use_success', {
+      model: model || '',
+      additional_metadata: JSON.stringify({
+        ...(toolName && { tool_name: toolName }),
+        ...(durationMs !== undefined && { duration_ms: durationMs })
+      })
+    })
+
+    const headers = buildTelemetryHeaders(accessToken, profile)
+    sendEvents([event], headers).catch(() => {})
+  } catch (err) {
+    logger.debug(`[Telemetry] emitToolUse error: ${err.message}`)
+  }
+}
+
+/**
+ * 发射 tool_use 错误事件
+ * 对照 CLI: tengu_tool_use_error
+ */
+async function emitToolUseError(accountId, accessToken, options = {}) {
+  const { model, toolName, errorType } = options
+
+  try {
+    const ps = getProfileService()
+    const profile = await ps.getActiveProfile()
+
+    const event = await buildEvent(accountId, 'tengu_tool_use_error', {
+      model: model || '',
+      additional_metadata: JSON.stringify({
+        ...(toolName && { tool_name: toolName }),
+        ...(errorType && { error_type: errorType })
+      })
+    })
+
+    const headers = buildTelemetryHeaders(accessToken, profile)
+    sendEvents([event], headers).catch(() => {})
+  } catch (err) {
+    logger.debug(`[Telemetry] emitToolUseError error: ${err.message}`)
+  }
+}
+
 module.exports = {
   emitApiQuery,
   emitApiSuccess,
   emitApiError,
   emitInit,
-  emitExit
+  emitExit,
+  emitToolUse,
+  emitToolUseError
 }

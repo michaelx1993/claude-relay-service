@@ -1181,6 +1181,12 @@ class ClaudeRelayService {
       delete processedBody.top_p
     }
 
+    // 🎭 thinking 启用时不发送 temperature（与 CLI 2.1.88 一致）
+    // CLI: const temperature = !hasThinking ? (options.temperatureOverride ?? 1) : undefined
+    if (processedBody.thinking && processedBody.thinking.type) {
+      delete processedBody.temperature
+    }
+
     // 处理统一的客户端标识
     if (account && account.useUnifiedClientId === 'true' && account.unifiedClientId) {
       this._replaceClientId(processedBody, account.unifiedClientId)
@@ -1571,6 +1577,16 @@ class ClaudeRelayService {
     )
     if (simulationHeaders) {
       simulationHeaders['content-length'] = String(contentLength)
+
+      // 保留客户端 SDK 的 retry/timeout headers（SDK 自动递增，不能丢弃）
+      const retryPassthrough = ['x-stainless-retry-count', 'x-stainless-timeout']
+      for (const key of retryPassthrough) {
+        const val = clientHeaders[key] || clientHeaders[key.toLowerCase()]
+        if (val !== undefined) {
+          simulationHeaders[key] = val
+        }
+      }
+
       logger.debug(`🎭 Headers built for account ${accountId}`)
       return {
         requestPayload,
@@ -1629,7 +1645,7 @@ class ClaudeRelayService {
   }
 
   // 🎭 构建模拟 headers（simulation 模式）
-  async _buildSimulationHeaders(accountId, accessToken, _requestPayload) {
+  async _buildSimulationHeaders(accountId, accessToken, requestPayload) {
     try {
       const profileService = require('../simulation/profileService')
       const deviceIdentityService = require('../../utils/deviceIdentityService')
@@ -1641,8 +1657,9 @@ class ClaudeRelayService {
       }
 
       const sessionId = await deviceIdentityService.getOrCreateSession(accountId)
+      const model = requestPayload?.model || ''
 
-      return buildSimulatedHeaders(accountId, profile, sessionId, accessToken)
+      return buildSimulatedHeaders(accountId, profile, sessionId, accessToken, { model })
     } catch (err) {
       logger.error(`[Simulation] _buildSimulationHeaders error: ${err.message}`)
       return null
@@ -1724,12 +1741,32 @@ class ClaudeRelayService {
         responseBody = this._restoreToolNamesInResponseBody(responseBody, toolNameMap)
       }
 
-      // 非流式遥测 — emitApiSuccess
+      // 非流式遥测 — emitApiSuccess + tool_use 检测
       if (config.simulation?.telemetryEnabled !== false) {
         const telemetrySimulator = require('../simulation/telemetrySimulator')
         telemetrySimulator
           .emitApiSuccess(accountId, accessToken, { model: body?.model })
           .catch(() => {})
+
+        // 检测响应中的 tool_use 内容块，发送 tengu_tool_use_success 遥测
+        try {
+          const parsed =
+            typeof responseBody === 'string' ? JSON.parse(responseBody) : responseBody
+          if (parsed?.content && Array.isArray(parsed.content)) {
+            for (const block of parsed.content) {
+              if (block?.type === 'tool_use' && block.name) {
+                telemetrySimulator
+                  .emitToolUse(accountId, accessToken, {
+                    model: body?.model,
+                    toolName: block.name
+                  })
+                  .catch(() => {})
+              }
+            }
+          }
+        } catch (_e) {
+          /* ignore parse errors */
+        }
       }
 
       return {
