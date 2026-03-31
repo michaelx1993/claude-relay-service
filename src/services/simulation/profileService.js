@@ -136,7 +136,7 @@ function getProfileHeaders(accountId, profile, sessionId, token) {
     'anthropic-beta': (profile.beta_flags || []).join(','),
     Authorization: `Bearer ${token}`,
     'Content-Type': 'application/json',
-    'x-stainless-lang': stainless.lang || 'javascript',
+    'x-stainless-lang': stainless.lang || 'js',
     'x-stainless-package-version': stainless.package_version || '0.39.0',
     'x-stainless-os': stainless.os || 'Mac OS X',
     'x-stainless-arch': stainless.arch || 'arm64',

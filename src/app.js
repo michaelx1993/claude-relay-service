@@ -166,6 +166,16 @@ class Application {
         logger.error('❌ Failed to start Bun sidecar:', error.message)
       }
 
+      // 🎭 初始化模拟 Profile 版本（显式指定 2.1.88）
+      try {
+        const profileService = require('./services/simulation/profileService')
+        const simulationVersion = config.simulation?.profileVersion || '2.1.88'
+        await profileService.setActiveProfile(simulationVersion)
+        logger.info(`🎭 Simulation profile initialized: ${simulationVersion}`)
+      } catch (error) {
+        logger.error('❌ Failed to initialize simulation profile:', error.message)
+      }
+
       // 超早期拦截 /admin-next/ 请求 - 在所有中间件之前
       this.app.use((req, res, next) => {
         if (req.path === '/admin-next/' && req.method === 'GET') {
