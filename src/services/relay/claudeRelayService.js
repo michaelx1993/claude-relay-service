@@ -2,7 +2,7 @@ const https = require('https')
 const zlib = require('zlib')
 const path = require('path')
 const ProxyHelper = require('../../utils/proxyHelper')
-const { filterForClaude } = require('../../utils/headerFilter')
+const { filterForClaude, buildSimulatedHeaders } = require('../../utils/headerFilter')
 const claudeAccountService = require('../account/claudeAccountService')
 const unifiedClaudeScheduler = require('../scheduler/unifiedClaudeScheduler')
 const sessionHelper = require('../../utils/sessionHelper')
@@ -1508,9 +1508,74 @@ class ClaudeRelayService {
       })
     }
 
+    // 🎭 Simulation 模式：注入指纹和设备身份到请求体
+    if (config.simulation?.enabled) {
+      try {
+        const fingerprintHelper = require('../../utils/fingerprintHelper')
+        const deviceIdentityService = require('../../utils/deviceIdentityService')
+        const profileService = require('../simulation/profileService')
+
+        const profile = await profileService.getActiveProfile()
+        const version = profile?.version || '2.1.88'
+
+        // T018: 计算首消息指纹并注入 attribution header 到 system prompt
+        const fingerprint = fingerprintHelper.computeFingerprintFromMessages(
+          requestPayload.messages,
+          version
+        )
+        const attributionHeader = fingerprintHelper.buildAttributionHeader(fingerprint, version)
+
+        // 注入到 system prompt（兼容 string 和 array 格式）
+        if (typeof requestPayload.system === 'string') {
+          requestPayload.system = attributionHeader + '\n' + requestPayload.system
+        } else if (Array.isArray(requestPayload.system)) {
+          requestPayload.system = [
+            { type: 'text', text: attributionHeader },
+            ...requestPayload.system
+          ]
+        } else {
+          requestPayload.system = [{ type: 'text', text: attributionHeader }]
+        }
+
+        // T019: 注入 metadata.user_id（覆盖客户端提供的值）
+        const metadataUserId = await deviceIdentityService.buildMetadataUserId(accountId)
+        if (!requestPayload.metadata) {
+          requestPayload.metadata = {}
+        }
+        requestPayload.metadata.user_id = metadataUserId
+
+        logger.debug(`🎭 [Simulation] Fingerprint: ${fingerprint}, metadata.user_id injected`)
+      } catch (err) {
+        logger.error(`[Simulation] Body injection error: ${err.message}`)
+      }
+    }
+
     // 序列化请求体，计算 content-length
     const bodyString = JSON.stringify(requestPayload)
     const contentLength = Buffer.byteLength(bodyString, 'utf8')
+
+    // 🎭 Simulation 模式：使用 profile-based 完全模拟 headers
+    if (config.simulation?.enabled) {
+      const simulationHeaders = await this._buildSimulationHeaders(
+        accountId,
+        accessToken,
+        requestPayload
+      )
+      if (simulationHeaders) {
+        simulationHeaders['content-length'] = String(contentLength)
+        logger.debug(`🎭 [Simulation] Headers built for account ${accountId}`)
+        return {
+          requestPayload,
+          bodyString,
+          headers: simulationHeaders,
+          isRealClaudeCode,
+          toolNameMap,
+          useSimulation: true
+        }
+      }
+      // fallback to normal headers if simulation headers fail
+      logger.warn('[Simulation] Failed to build simulation headers, falling back to normal')
+    }
 
     // 构建最终请求头（包含认证、版本、User-Agent、Beta 等）
     // Force identity encoding to prevent upstream (Cloudflare) from returning
@@ -1585,6 +1650,27 @@ class ClaudeRelayService {
     }
   }
 
+  // 🎭 构建模拟 headers（simulation 模式）
+  async _buildSimulationHeaders(accountId, accessToken, _requestPayload) {
+    try {
+      const profileService = require('../simulation/profileService')
+      const deviceIdentityService = require('../../utils/deviceIdentityService')
+
+      const profile = await profileService.getActiveProfile()
+      if (!profile) {
+        logger.warn('[Simulation] No active profile found')
+        return null
+      }
+
+      const sessionId = await deviceIdentityService.getOrCreateSession(accountId)
+
+      return buildSimulatedHeaders(accountId, profile, sessionId, accessToken)
+    } catch (err) {
+      logger.error(`[Simulation] _buildSimulationHeaders error: ${err.message}`)
+      return null
+    }
+  }
+
   // 🔗 发送请求到Claude API
   async _makeClaudeRequest(
     body,
@@ -1619,6 +1705,76 @@ class ClaudeRelayService {
 
     let { bodyString } = prepared
     const { headers, isRealClaudeCode, toolNameMap } = prepared
+
+    // 🎭 Simulation 模式：通过 sidecar 转发
+    if (prepared.useSimulation) {
+      // T023: 非流式遥测 — emitApiQuery
+      if (config.simulation?.telemetryEnabled !== false) {
+        const telemetrySimulator = require('../simulation/telemetrySimulator')
+        telemetrySimulator
+          .emitApiQuery(accountId, accessToken, {
+            model: body?.model,
+            messagesLength: body?.messages?.length
+          })
+          .catch(() => {})
+      }
+
+      try {
+        const sidecarClient = require('../sidecar/sidecarClient')
+        let requestPath = url.pathname
+        if (requestOptions.customPath) {
+          const baseUrl = new URL('https://api.anthropic.com')
+          const customUrl = new URL(requestOptions.customPath, baseUrl)
+          requestPath = customUrl.pathname
+        }
+        const targetUrl = `https://${url.hostname}${requestPath}${url.search || ''}`
+        const result = await sidecarClient.forward({
+          method: 'POST',
+          url: targetUrl,
+          headers,
+          body: bodyString,
+          timeout: config.requestTimeout || 600000,
+          stream: false
+        })
+
+        let responseBody = result.body
+        if (!isRealClaudeCode) {
+          responseBody = this._restoreToolNamesInResponseBody(responseBody, toolNameMap)
+        }
+
+        // T023: 非流式遥测 — emitApiSuccess
+        if (config.simulation?.telemetryEnabled !== false) {
+          const telemetrySimulator = require('../simulation/telemetrySimulator')
+          telemetrySimulator
+            .emitApiSuccess(accountId, accessToken, { model: body?.model })
+            .catch(() => {})
+        }
+
+        return {
+          statusCode: result.status,
+          headers: result.headers,
+          body: responseBody
+        }
+      } catch (sidecarErr) {
+        // T023: 非流式遥测 — emitApiError
+        if (config.simulation?.telemetryEnabled !== false) {
+          const telemetrySimulator = require('../simulation/telemetrySimulator')
+          telemetrySimulator
+            .emitApiError(accountId, accessToken, {
+              model: body?.model,
+              status: sidecarErr.statusCode,
+              errorType: sidecarErr.code || 'sidecar_error'
+            })
+            .catch(() => {})
+        }
+
+        if (sidecarErr.statusCode === 503) {
+          throw sidecarErr
+        }
+        logger.error(`[Simulation] Sidecar forward failed: ${sidecarErr.message}`)
+        throw sidecarErr
+      }
+    }
 
     return new Promise((resolve, reject) => {
       // 支持自定义路径（如 count_tokens）
@@ -2057,8 +2213,93 @@ class ClaudeRelayService {
         timeout: config.requestTimeout || 600000
       }
 
-      const req = https.request(options, async (res) => {
+      // 🎭 Simulation 模式：通过 sidecar Unix socket 转发
+      // T022: 流式遥测 — emitApiQuery
+      if (prepared.useSimulation && config.simulation?.telemetryEnabled !== false) {
+        const telemetrySimulator = require('../simulation/telemetrySimulator')
+        telemetrySimulator
+          .emitApiQuery(accountId, accessToken, {
+            model: body?.model,
+            messagesLength: body?.messages?.length
+          })
+          .catch(() => {})
+      }
+
+      let req
+      if (prepared.useSimulation) {
+        const http = require('http')
+        const socketPath =
+          config.simulation?.sidecarSocketPath ||
+          `/tmp/bun-relay-${config.server?.port || 3000}.sock`
+        const targetUrl = `https://${url.hostname}${url.pathname}${url.search || ''}`
+        const sidecarPayload = JSON.stringify({
+          method: 'POST',
+          url: targetUrl,
+          headers,
+          body: bodyString,
+          timeout: config.requestTimeout || 600000,
+          stream: true
+        })
+        req = http.request(
+          {
+            socketPath,
+            path: '/',
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Content-Length': Buffer.byteLength(sidecarPayload)
+            },
+            timeout: config.requestTimeout || 600000
+          },
+          async (sidecarRes) => {
+            // 构建兼容的 res 对象
+            const upstreamStatus =
+              parseInt(sidecarRes.headers['x-upstream-status']) || sidecarRes.statusCode
+            let upstreamHeaders = {}
+            if (sidecarRes.headers['x-upstream-headers']) {
+              try {
+                upstreamHeaders = JSON.parse(
+                  Buffer.from(sidecarRes.headers['x-upstream-headers'], 'base64').toString()
+                )
+              } catch (_e) {
+                /* ignore */
+              }
+            }
+            // 覆盖 statusCode 和 headers 为上游的值
+            sidecarRes.statusCode = upstreamStatus
+            Object.assign(sidecarRes.headers, upstreamHeaders)
+            handleRes(sidecarRes)
+          }
+        )
+        req.write(sidecarPayload)
+        req.end()
+      } else {
+        req = https.request(options, async (res) => {
+          handleRes(res)
+        })
+      }
+
+      // 统一的响应处理函数（箭头函数保持 this 上下文）
+      const handleRes = async (res) => {
         logger.debug(`🌊 Claude stream response status: ${res.statusCode}`)
+
+        // T022: 流式遥测 — 根据状态码发送 success 或 error
+        if (prepared.useSimulation && config.simulation?.telemetryEnabled !== false) {
+          const telemetrySimulator = require('../simulation/telemetrySimulator')
+          if (res.statusCode === 200) {
+            telemetrySimulator
+              .emitApiSuccess(accountId, accessToken, { model: body?.model })
+              .catch(() => {})
+          } else {
+            telemetrySimulator
+              .emitApiError(accountId, accessToken, {
+                model: body?.model,
+                status: res.statusCode,
+                errorType: 'http_error'
+              })
+              .catch(() => {})
+          }
+        }
 
         // 错误响应处理
         if (res.statusCode !== 200) {
@@ -2872,7 +3113,7 @@ class ClaudeRelayService {
           logger.debug('🌊 Claude stream response with usage capture completed')
           resolve()
         })
-      })
+      }
 
       req.on('error', async (error) => {
         logger.error(
@@ -2973,11 +3214,13 @@ class ClaudeRelayService {
         }
       })
 
-      // 写入请求体
-      req.write(bodyString)
-      // 🧹 内存优化：立即清空 bodyString 引用，避免闭包捕获
-      bodyString = null
-      req.end()
+      // 写入请求体（仅非 simulation 路径，simulation 路径已在上方发送）
+      if (!prepared.useSimulation) {
+        req.write(bodyString)
+        // 🧹 内存优化：立即清空 bodyString 引用，避免闭包捕获
+        bodyString = null
+        req.end()
+      }
     })
   }
 

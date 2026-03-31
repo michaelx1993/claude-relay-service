@@ -1,0 +1,46 @@
+{
+  "version": "2.1.88",
+  "user_agent": "claude-cli/2.1.88 (external, cli)",
+  "api_version": "2023-06-01",
+  "beta_flags": [
+    "claude-code-20250219",
+    "oauth-2025-04-20",
+    "interleaved-thinking-2025-05-14",
+    "redact-thinking-2026-02-12",
+    "context-management-2025-06-27",
+    "prompt-caching-scope-2026-01-05",
+    "effort-2025-11-24",
+    "advisor-tool-2026-03-01",
+    "advanced-tool-use-2025-11-20",
+    "fast-mode-2026-02-01",
+    "task-budgets-2026-03-13",
+    "structured-outputs-2025-12-15",
+    "afk-mode-2026-01-31",
+    "context-1m-2025-08-07"
+  ],
+  "fingerprint_salt": "59cf53e54c78",
+  "stainless": {
+    "lang": "javascript",
+    "runtime": "bun",
+    "runtime_version": "1.2.5",
+    "os": "Mac OS X",
+    "arch": "arm64",
+    "package_version": "0.39.0"
+  },
+  "header_order": [
+    "x-app",
+    "User-Agent",
+    "X-Claude-Code-Session-Id",
+    "x-client-request-id",
+    "anthropic-version",
+    "anthropic-beta",
+    "Authorization",
+    "Content-Type",
+    "x-stainless-lang",
+    "x-stainless-package-version",
+    "x-stainless-os",
+    "x-stainless-arch",
+    "x-stainless-runtime",
+    "x-stainless-runtime-version"
+  ]
+}

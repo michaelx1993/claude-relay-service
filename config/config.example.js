@@ -200,6 +200,17 @@ const config = {
     retries: parseInt(process.env.WEBHOOK_RETRIES) || 3 // 重试3次
   },
 
+  // 🎭 Claude Code 模拟配置
+  simulation: {
+    enabled: process.env.SIMULATION_ENABLED === 'true',
+    sidecarSocketPath:
+      process.env.SIDECAR_SOCKET_PATH ||
+      `/tmp/bun-relay-${parseInt(process.env.PORT) || 3000}.sock`,
+    profileVersion: process.env.SIMULATION_PROFILE_VERSION || '2.1.88',
+    sessionRotationHours: parseInt(process.env.SIMULATION_SESSION_ROTATION_HOURS) || 24,
+    telemetryEnabled: process.env.SIMULATION_TELEMETRY_ENABLED !== 'false' // 默认跟随 simulation.enabled
+  },
+
   // 🛠️ 开发配置
   development: {
     debug: process.env.DEBUG === 'true',

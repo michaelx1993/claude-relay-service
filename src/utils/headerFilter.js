@@ -114,9 +114,51 @@ function filterForGemini(headers) {
   return filtered
 }
 
+/**
+ * 为 Claude Code 模拟模式构建完整 headers
+ * 完全替换客户端 headers，使用 profile 定义的精确顺序和值
+ */
+function buildSimulatedHeaders(accountId, profile, sessionId, token) {
+  const { randomUUID } = require('crypto')
+
+  const stainless = profile.stainless || {}
+  const order = profile.header_order || []
+
+  // 预定义所有 header 值
+  const headerValues = {
+    'x-app': 'cli',
+    'User-Agent': profile.user_agent,
+    'X-Claude-Code-Session-Id': sessionId,
+    'x-client-request-id': randomUUID(),
+    'anthropic-version': profile.api_version,
+    'anthropic-beta': Array.isArray(profile.beta_flags)
+      ? profile.beta_flags.join(',')
+      : profile.beta_flags,
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/json',
+    'x-stainless-lang': stainless.lang || 'javascript',
+    'x-stainless-package-version': stainless.package_version || '0.39.0',
+    'x-stainless-os': stainless.os || 'Mac OS X',
+    'x-stainless-arch': stainless.arch || 'arm64',
+    'x-stainless-runtime': stainless.runtime || 'bun',
+    'x-stainless-runtime-version': stainless.runtime_version || '1.2.5'
+  }
+
+  // 按 header_order 顺序构建（顺序很重要）
+  const headers = {}
+  for (const key of order) {
+    if (headerValues[key] !== undefined) {
+      headers[key] = headerValues[key]
+    }
+  }
+
+  return headers
+}
+
 module.exports = {
   cdnHeaders,
   filterForOpenAI,
   filterForClaude,
-  filterForGemini
+  filterForGemini,
+  buildSimulatedHeaders
 }

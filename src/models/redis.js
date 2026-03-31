@@ -5278,4 +5278,161 @@ redisClient.cleanupSystemMetrics = async function () {
   return { cleaned: toDelete.length }
 }
 
+// ============================================================
+// Claude Code Simulation — Redis Key 操作
+// ============================================================
+
+// --- 1. Version Profile ---
+
+redisClient.getClaudeCodeProfile = async function (version) {
+  const data = await this.client.hgetall(`claude_code_profile:${version}`)
+  if (!data || !data.version) return null
+  if (data.header_order) {
+    try {
+      data.header_order = JSON.parse(data.header_order)
+    } catch (_e) {
+      /* keep raw string */
+    }
+  }
+  return data
+}
+
+redisClient.setClaudeCodeProfile = async function (version, profileData) {
+  const key = `claude_code_profile:${version}`
+  const data = { ...profileData }
+  if (Array.isArray(data.header_order)) {
+    data.header_order = JSON.stringify(data.header_order)
+  }
+  if (!data.created_at) {
+    data.created_at = new Date().toISOString()
+  }
+  await this.client.hmset(key, data)
+}
+
+redisClient.deleteClaudeCodeProfile = async function (version) {
+  await this.client.del(`claude_code_profile:${version}`)
+}
+
+redisClient.listClaudeCodeProfiles = async function () {
+  const keys = await this.scanKeys('claude_code_profile:*')
+  const versions = keys.map((k) => k.replace('claude_code_profile:', ''))
+  return versions
+}
+
+// --- 2. Active Profile Pointer ---
+
+redisClient.getActiveClaudeCodeProfile = async function () {
+  return await this.client.get('claude_code_active_profile')
+}
+
+redisClient.setActiveClaudeCodeProfile = async function (version) {
+  await this.client.set('claude_code_active_profile', version)
+}
+
+// --- 3. Account Session ---
+
+redisClient.getClaudeSession = async function (accountId) {
+  const data = await this.client.hgetall(`claude_session:${accountId}`)
+  if (!data || !data.session_id) return null
+  return data
+}
+
+redisClient.setClaudeSession = async function (accountId, sessionData, ttlSeconds = 86400) {
+  const key = `claude_session:${accountId}`
+  const data = { ...sessionData }
+  if (!data.created_at) {
+    data.created_at = new Date().toISOString()
+  }
+  data.last_used_at = new Date().toISOString()
+  await this.client.hmset(key, data)
+  if (ttlSeconds > 0) {
+    await this.client.expire(key, ttlSeconds)
+  }
+}
+
+redisClient.touchClaudeSession = async function (accountId) {
+  const key = `claude_session:${accountId}`
+  const exists = await this.client.exists(key)
+  if (exists) {
+    await this.client.hset(key, 'last_used_at', new Date().toISOString())
+  }
+}
+
+redisClient.deleteClaudeSession = async function (accountId) {
+  await this.client.del(`claude_session:${accountId}`)
+}
+
+// --- 4. Account Device Identity ---
+
+redisClient.getClaudeDevice = async function (accountId) {
+  const data = await this.client.hgetall(`claude_device:${accountId}`)
+  if (!data || !data.device_id) return null
+  return data
+}
+
+redisClient.setClaudeDevice = async function (accountId, deviceData) {
+  const key = `claude_device:${accountId}`
+  const data = { ...deviceData }
+  if (!data.created_at) {
+    data.created_at = new Date().toISOString()
+  }
+  await this.client.hmset(key, data)
+  // No TTL — permanent persistence
+}
+
+redisClient.deleteClaudeDevice = async function (accountId) {
+  await this.client.del(`claude_device:${accountId}`)
+}
+
+// --- 5. Sidecar Health ---
+
+redisClient.getSidecarHealth = async function () {
+  const data = await this.client.hgetall('bun_sidecar_health')
+  if (!data || !data.status) return null
+  if (data.pid) data.pid = parseInt(data.pid)
+  if (data.restart_count) data.restart_count = parseInt(data.restart_count)
+  return data
+}
+
+redisClient.setSidecarHealth = async function (healthData, ttlSeconds = 30) {
+  const key = 'bun_sidecar_health'
+  const data = { ...healthData }
+  data.last_heartbeat = new Date().toISOString()
+  await this.client.hmset(key, data)
+  if (ttlSeconds > 0) {
+    await this.client.expire(key, ttlSeconds)
+  }
+}
+
+redisClient.deleteSidecarHealth = async function () {
+  await this.client.del('bun_sidecar_health')
+}
+
+// ==================== Profile Change Pub/Sub ====================
+
+const PROFILE_CHANGE_CHANNEL = 'claude_code_profile_change'
+
+/**
+ * 发布 profile 变更通知
+ */
+redisClient.publishProfileChange = async function (version) {
+  try {
+    await this.client.publish(PROFILE_CHANGE_CHANNEL, version || 'updated')
+  } catch (_e) {
+    // pub/sub 失败不影响主流程
+  }
+}
+
+/**
+ * 订阅 profile 变更通知
+ * @param {Function} callback - 变更回调
+ */
+redisClient.subscribeProfileChange = async function (callback) {
+  // 创建一个独立的 subscriber 连接（Redis pub/sub 需要专用连接）
+  const subscriber = this.client.duplicate()
+  await subscriber.subscribe(PROFILE_CHANGE_CHANNEL, (message) => {
+    if (callback) callback(message)
+  })
+}
+
 module.exports = redisClient
