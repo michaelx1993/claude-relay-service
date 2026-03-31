@@ -22,21 +22,35 @@ function getRedis() {
 
 /**
  * 获取或创建设备 ID（per-account 持久化，无 TTL）
- * 格式：randomBytes(64).toString('hex') = 128 个十六进制字符
+ * 与 2.1.88-src/src/utils/config.ts getOrCreateUserID() 完全一致：
+ * randomBytes(32).toString('hex') = 64 个十六进制字符
  *
  * @param {string} accountId
- * @returns {Promise<string>} 128-char hex device ID
+ * @returns {Promise<string>} 64-char hex device ID
  */
 async function getOrCreateDeviceId(accountId) {
   const redis = getRedis()
 
   const existing = await redis.getClaudeDevice(accountId)
   if (existing && existing.device_id) {
+    // 自动迁移：旧版本生成的 128 字符 device_id 需要重新生成为 64 字符
+    if (existing.device_id.length !== 64) {
+      logger.info(
+        `[DeviceIdentity] Migrating device_id for account ${accountId.slice(0, 8)}... (${existing.device_id.length} → 64 chars)`
+      )
+      const newDeviceId = randomBytes(32).toString('hex')
+      await redis.setClaudeDevice(accountId, {
+        device_id: newDeviceId,
+        created_at: existing.created_at || new Date().toISOString(),
+        migrated_at: new Date().toISOString()
+      })
+      return newDeviceId
+    }
     return existing.device_id
   }
 
-  // 生成新 device_id
-  const deviceId = randomBytes(64).toString('hex')
+  // 生成新 device_id — 与真实 CLI 一致：randomBytes(32) = 64 hex chars
+  const deviceId = randomBytes(32).toString('hex')
 
   await redis.setClaudeDevice(accountId, {
     device_id: deviceId,

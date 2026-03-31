@@ -37,7 +37,7 @@ describe('Telemetry Simulator', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     // Mock device & session
-    redis.getClaudeDevice.mockResolvedValue({ device_id: 'test-device-id' })
+    redis.getClaudeDevice.mockResolvedValue({ device_id: 'a'.repeat(64) })
     redis.getClaudeSession.mockResolvedValue({ session_id: 'test-session-id' })
     redis.getActiveClaudeCodeProfile.mockResolvedValue('2.1.88')
     redis.getClaudeCodeProfile.mockResolvedValue(null)
@@ -61,7 +61,7 @@ describe('Telemetry Simulator', () => {
       const event = call.body.events[0]
       expect(event.event_type).toBe('ClaudeCodeInternalEvent')
       expect(event.event_data.event_name).toBe('tengu_api_query')
-      expect(event.event_data.device_id).toBe('test-device-id')
+      expect(event.event_data.device_id).toBe('a'.repeat(64))
       expect(event.event_data.session_id).toBe('test-session-id')
       expect(event.event_data.model).toBe('claude-sonnet-4-20250514')
     })

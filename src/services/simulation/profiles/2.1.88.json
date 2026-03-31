@@ -9,18 +9,16 @@
     "redact-thinking-2026-02-12",
     "context-management-2025-06-27",
     "prompt-caching-scope-2026-01-05",
-    "effort-2025-11-24",
-    "advisor-tool-2026-03-01",
     "advanced-tool-use-2025-11-20",
-    "fast-mode-2026-02-01",
+    "advisor-tool-2026-03-01",
+    "effort-2025-11-24",
     "task-budgets-2026-03-13",
-    "structured-outputs-2025-12-15",
-    "afk-mode-2026-01-31",
-    "context-1m-2025-08-07"
+    "fast-mode-2026-02-01",
+    "structured-outputs-2025-12-15"
   ],
   "fingerprint_salt": "59cf53e54c78",
   "stainless": {
-    "lang": "javascript",
+    "lang": "js",
     "runtime": "bun",
     "runtime_version": "1.2.5",
     "os": "Mac OS X",

@@ -40,7 +40,7 @@ describe('E2E Simulation', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     redis.getClaudeDevice.mockResolvedValue({
-      device_id: 'a'.repeat(128) // 128 hex chars
+      device_id: 'a'.repeat(64) // 64 hex chars (与真实 CLI 一致)
     })
     redis.getClaudeSession.mockResolvedValue({
       session_id: 'session-uuid-v4'
@@ -69,14 +69,14 @@ describe('E2E Simulation', () => {
       const id1 = await deviceIdentityService.getOrCreateDeviceId(ACCOUNT_ID)
       const id2 = await deviceIdentityService.getOrCreateDeviceId(ACCOUNT_ID)
       expect(id1).toBe(id2)
-      expect(id1).toBe('a'.repeat(128))
+      expect(id1).toBe('a'.repeat(64))
     })
 
-    it('should create 128-char hex device_id when not exists', async () => {
+    it('should create 64-char hex device_id when not exists', async () => {
       redis.getClaudeDevice.mockResolvedValue(null)
       const id = await deviceIdentityService.getOrCreateDeviceId(ACCOUNT_ID)
-      expect(id).toHaveLength(128)
-      expect(id).toMatch(/^[0-9a-f]{128}$/)
+      expect(id).toHaveLength(64)
+      expect(id).toMatch(/^[0-9a-f]{64}$/)
     })
 
     it('should return same session_id for same account within TTL', async () => {
@@ -91,7 +91,7 @@ describe('E2E Simulation', () => {
       const userId = await deviceIdentityService.buildMetadataUserId(ACCOUNT_ID)
       const parsed = JSON.parse(userId)
 
-      expect(parsed).toHaveProperty('device_id', 'a'.repeat(128))
+      expect(parsed).toHaveProperty('device_id', 'a'.repeat(64))
       expect(parsed).toHaveProperty('account_uuid', ACCOUNT_ID)
       expect(parsed).toHaveProperty('session_id', 'session-uuid-v4')
     })
