@@ -157,15 +157,13 @@ class Application {
         logger.error('📁 Account group reverse index migration failed:', err)
       })
 
-      // 🎭 启动 Bun Sidecar（Claude Code 模拟）
-      if (config.simulation?.enabled) {
-        try {
-          const sidecarManager = require('./services/sidecar/sidecarManager')
-          await sidecarManager.start()
-          logger.info('🎭 Bun sidecar started for Claude Code simulation')
-        } catch (error) {
-          logger.error('❌ Failed to start Bun sidecar:', error.message)
-        }
+      // 🎭 启动 Bun Sidecar（Claude Code CLI 模拟）
+      try {
+        const sidecarManager = require('./services/sidecar/sidecarManager')
+        await sidecarManager.start()
+        logger.info('🎭 Bun sidecar started for Claude Code simulation')
+      } catch (error) {
+        logger.error('❌ Failed to start Bun sidecar:', error.message)
       }
 
       // 超早期拦截 /admin-next/ 请求 - 在所有中间件之前

@@ -202,7 +202,7 @@ const config = {
 
   // 🎭 Claude Code 模拟配置
   simulation: {
-    enabled: process.env.SIMULATION_ENABLED === 'true',
+    enabled: process.env.SIMULATION_ENABLED !== 'false',
     sidecarSocketPath:
       process.env.SIDECAR_SOCKET_PATH ||
       `/tmp/bun-relay-${parseInt(process.env.PORT) || 3000}.sock`,

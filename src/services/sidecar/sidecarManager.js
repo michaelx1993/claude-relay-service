@@ -27,11 +27,6 @@ class SidecarManager {
   }
 
   async start() {
-    if (!config.simulation?.enabled) {
-      logger.debug('[SidecarManager] simulation.enabled=false, skipping sidecar')
-      return
-    }
-
     if (this.started) {
       logger.warn('[SidecarManager] Already started')
       return
