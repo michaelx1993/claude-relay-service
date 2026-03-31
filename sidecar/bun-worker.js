@@ -72,18 +72,22 @@ async function handleTelemetry(req) {
     return Response.json({ error: 'invalid_json' }, { status: 400 })
   }
 
-  const { url: targetUrl, headers: targetHeaders, body: targetBody } = payload
+  const { url: targetUrl, headers: targetHeaders, body: targetBody, proxy: proxyUrl } = payload
 
   if (!targetUrl) {
     return Response.json({ error: 'missing_url' }, { status: 400 })
   }
 
   try {
-    const upstreamRes = await fetch(targetUrl, {
+    const telemetryFetchOptions = {
       method: 'POST',
       headers: targetHeaders || {},
       body: typeof targetBody === 'string' ? targetBody : JSON.stringify(targetBody)
-    })
+    }
+    if (proxyUrl) {
+      telemetryFetchOptions.proxy = proxyUrl
+    }
+    const upstreamRes = await fetch(targetUrl, telemetryFetchOptions)
 
     return Response.json({
       status: 'ok',
@@ -115,7 +119,8 @@ async function handleProxy(req) {
     headers: targetHeaders = {},
     body: targetBody,
     timeout = 600000,
-    stream = false
+    stream = false,
+    proxy: proxyUrl = null
   } = payload
 
   if (!targetUrl) {
@@ -128,12 +133,19 @@ async function handleProxy(req) {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), timeout)
 
-    const upstreamRes = await fetch(targetUrl, {
+    const fetchOptions = {
       method,
       headers: targetHeaders,
       body: typeof targetBody === 'string' ? targetBody : JSON.stringify(targetBody),
       signal: controller.signal
-    })
+    }
+
+    // Bun 原生支持 proxy 参数（socks5/http/https）
+    if (proxyUrl) {
+      fetchOptions.proxy = proxyUrl
+    }
+
+    const upstreamRes = await fetch(targetUrl, fetchOptions)
 
     clearTimeout(timeoutId)
 

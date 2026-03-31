@@ -1444,6 +1444,17 @@ class ClaudeRelayService {
     }
   }
 
+  // 🌐 从账户代理配置构建代理 URL（用于 sidecar 转发）
+  _buildProxyUrl(proxyConfig) {
+    if (!proxyConfig || !proxyConfig.host || !proxyConfig.port) return null
+    const auth =
+      proxyConfig.username && proxyConfig.password
+        ? `${proxyConfig.username}:${proxyConfig.password}@`
+        : ''
+    const scheme = proxyConfig.type === 'socks5' ? 'socks5h' : proxyConfig.type || 'http'
+    return `${scheme}://${auth}${proxyConfig.host}:${proxyConfig.port}`
+  }
+
   // 🔧 过滤客户端请求头
   _filterClientHeaders(clientHeaders) {
     // 使用统一的 headerFilter 工具类
@@ -1728,13 +1739,18 @@ class ClaudeRelayService {
           requestPath = customUrl.pathname
         }
         const targetUrl = `https://${url.hostname}${requestPath}${url.search || ''}`
+
+        // 获取账户代理配置（动态 per-account SOCKS5/HTTP proxy）
+        const proxyUrl = account?.proxy ? this._buildProxyUrl(account.proxy) : null
+
         const result = await sidecarClient.forward({
           method: 'POST',
           url: targetUrl,
           headers,
           body: bodyString,
           timeout: config.requestTimeout || 600000,
-          stream: false
+          stream: false,
+          proxy: proxyUrl
         })
 
         let responseBody = result.body
@@ -2232,13 +2248,18 @@ class ClaudeRelayService {
           config.simulation?.sidecarSocketPath ||
           `/tmp/bun-relay-${config.server?.port || 3000}.sock`
         const targetUrl = `https://${url.hostname}${url.pathname}${url.search || ''}`
+
+        // 获取账户代理配置（动态 per-account SOCKS5/HTTP proxy）
+        const proxyUrl = account?.proxy ? this._buildProxyUrl(account.proxy) : null
+
         const sidecarPayload = JSON.stringify({
           method: 'POST',
           url: targetUrl,
           headers,
           body: bodyString,
           timeout: config.requestTimeout || 600000,
-          stream: true
+          stream: true,
+          proxy: proxyUrl
         })
         req = http.request(
           {
