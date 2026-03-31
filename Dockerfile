@@ -43,7 +43,14 @@ RUN apk add --no-cache \
     curl \
     dumb-init \
     sed \
+    bash \
+    unzip \
     && rm -rf /var/cache/apk/*
+
+# 🎭 安装 Bun 运行时（用于 TLS 指纹模拟 sidecar）
+RUN curl -fsSL https://bun.sh/install | bash \
+    && ln -s /root/.bun/bin/bun /usr/local/bin/bun \
+    && bun --version
 
 # 📁 设置工作目录
 WORKDIR /app

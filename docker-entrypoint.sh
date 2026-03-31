@@ -60,6 +60,13 @@ else
   fi
 fi
 
+# 🎭 验证 Bun 运行时（用于 TLS 指纹模拟 sidecar）
+if command -v bun >/dev/null 2>&1; then
+  echo "✅ Bun runtime: $(bun --version)"
+else
+  echo "⚠️  警告: Bun 未安装，sidecar TLS 指纹模拟不可用"
+fi
+
 # 启动应用
 echo "🌐 启动 Claude Relay Service..."
 exec "$@"

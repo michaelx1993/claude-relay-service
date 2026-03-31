@@ -73,6 +73,12 @@ services:
       - WEB_DESCRIPTION=${WEB_DESCRIPTION:-Multi-account Claude API relay service}
       - WEB_LOGO_URL=${WEB_LOGO_URL:-/assets/logo.png}
       
+      # 🎭 Claude Code 模拟配置
+      - SIMULATION_ENABLED=${SIMULATION_ENABLED:-true}
+      - SIMULATION_PROFILE_VERSION=${SIMULATION_PROFILE_VERSION:-2.1.88}
+      - SIMULATION_TELEMETRY_ENABLED=${SIMULATION_TELEMETRY_ENABLED:-true}
+      - SIMULATION_SESSION_ROTATION_HOURS=${SIMULATION_SESSION_ROTATION_HOURS:-24}
+
       # 🛠️ 开发配置
       - DEBUG=${DEBUG:-false}
       - ENABLE_CORS=${ENABLE_CORS:-true}
