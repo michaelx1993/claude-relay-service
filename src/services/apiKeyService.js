@@ -226,7 +226,7 @@ class ApiKeyService {
       const costRankService = require('./costRankService')
       await costRankService.addKeyToIndexes(keyId)
     } catch (err) {
-      logger.warn(`Failed to add key ${keyId} to cost rank indexes:`, err.message)
+      logger.warn(`Failed to add key ${keyId} to cost rank indexes: ${err.message}`)
     }
 
     // 同步添加到 API Key 索引（用于分页查询优化）
@@ -242,7 +242,7 @@ class ApiKeyService {
         tags: JSON.parse(keyData.tags || '[]')
       })
     } catch (err) {
-      logger.warn(`Failed to add key ${keyId} to API Key index:`, err.message)
+      logger.warn(`Failed to add key ${keyId} to API Key index: ${err.message}`)
     }
 
     logger.success(`🔑 Generated new API key: ${name} (${keyId})`)
@@ -1286,7 +1286,7 @@ class ApiKeyService {
           tags: JSON.parse(keyData.tags || '[]')
         })
       } catch (err) {
-        logger.warn(`Failed to update API Key index for ${keyId}:`, err.message)
+        logger.warn(`Failed to update API Key index for ${keyId}: ${err.message}`)
       }
 
       logger.success(`📝 Updated API key: ${keyId}, hashMap updated`)
@@ -1328,7 +1328,7 @@ class ApiKeyService {
         const costRankService = require('./costRankService')
         await costRankService.removeKeyFromIndexes(keyId)
       } catch (err) {
-        logger.warn(`Failed to remove key ${keyId} from cost rank indexes:`, err.message)
+        logger.warn(`Failed to remove key ${keyId} from cost rank indexes: ${err.message}`)
       }
 
       // 更新 API Key 索引（标记为已删除）
@@ -1345,7 +1345,7 @@ class ApiKeyService {
           }
         )
       } catch (err) {
-        logger.warn(`Failed to update API Key index for deleted key ${keyId}:`, err.message)
+        logger.warn(`Failed to update API Key index for deleted key ${keyId}: ${err.message}`)
       }
 
       logger.success(`🗑️ Soft deleted API key: ${keyId} by ${deletedBy} (${deletedByType})`)
@@ -1404,7 +1404,7 @@ class ApiKeyService {
         const costRankService = require('./costRankService')
         await costRankService.addKeyToIndexes(keyId)
       } catch (err) {
-        logger.warn(`Failed to add restored key ${keyId} to cost rank indexes:`, err.message)
+        logger.warn(`Failed to add restored key ${keyId} to cost rank indexes: ${err.message}`)
       }
 
       // 更新 API Key 索引（恢复为活跃状态）
@@ -1421,7 +1421,7 @@ class ApiKeyService {
           }
         )
       } catch (err) {
-        logger.warn(`Failed to update API Key index for restored key ${keyId}:`, err.message)
+        logger.warn(`Failed to update API Key index for restored key ${keyId}: ${err.message}`)
       }
 
       logger.success(`Restored API key: ${keyId} by ${restoredBy} (${restoredByType})`)
@@ -1472,7 +1472,7 @@ class ApiKeyService {
           tags: JSON.parse(keyData.tags || '[]')
         })
       } catch (err) {
-        logger.warn(`Failed to remove key ${keyId} from API Key index:`, err.message)
+        logger.warn(`Failed to remove key ${keyId} from API Key index: ${err.message}`)
       }
 
       // 删除API Key本身

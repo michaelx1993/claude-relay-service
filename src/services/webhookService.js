@@ -95,7 +95,7 @@ class WebhookService {
 
       logger.info(`✅ 成功发送到 ${platform.name || platform.type}`)
     } catch (error) {
-      logger.error(`❌ 发送到 ${platform.name || platform.type} 失败:`, error.message)
+      logger.error(`❌ 发送到 ${platform.name || platform.type} 失败: ${error.message}`)
       throw error
     }
   }

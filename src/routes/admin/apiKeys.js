@@ -1177,7 +1177,7 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
       }
     }
   } catch (error) {
-    logger.warn(`⚠️ 获取实时限制数据失败 (key: ${keyId}):`, error.message)
+    logger.warn(`⚠️ 获取实时限制数据失败 (key: ${keyId}): ${error.message}`)
   }
 
   // 构建实时限制数据对象（各分支复用）
