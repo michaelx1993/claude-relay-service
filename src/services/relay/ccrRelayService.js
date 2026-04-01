@@ -209,12 +209,15 @@ class CcrRelayService {
         `[DEBUG] Initial headers before beta: ${JSON.stringify(requestConfig.headers, null, 2)}`
       )
 
-      // 添加beta header如果需要
-      if (options.betaHeader) {
-        logger.debug(`[DEBUG] Adding beta header: ${options.betaHeader}`)
-        requestConfig.headers['anthropic-beta'] = options.betaHeader
-      } else {
-        logger.debug('[DEBUG] No beta header to add')
+      // 使用 profile 驱动的 beta header（按模型动态调整 + 合并客户端 beta）
+      const { buildBetaHeader } = require('../../utils/headerFilter')
+      const betaHeaderValue = await buildBetaHeader(
+        options.model || requestConfig.data?.model,
+        options.betaHeader
+      )
+      if (betaHeaderValue) {
+        requestConfig.headers['anthropic-beta'] = betaHeaderValue
+        logger.debug(`[DEBUG] Beta header set: ${betaHeaderValue}`)
       }
 
       // 发送请求
@@ -623,9 +626,31 @@ class CcrRelayService {
         logger.debug('[DEBUG] Using Authorization Bearer authentication')
       }
 
-      // 添加beta header如果需要
-      if (requestOptions.betaHeader) {
-        requestConfig.headers['anthropic-beta'] = requestOptions.betaHeader
+      // 使用 profile 驱动的 beta header（按模型动态调整 + 合并客户端 beta）
+      try {
+        const { getModelBetas } = require('../../utils/headerFilter')
+        const profileJson = require('../simulation/profiles/2.1.87.json')
+        const profileBetas = getModelBetas(
+          profileJson.beta_flags,
+          requestOptions.model || requestConfig.data?.model
+        )
+        if (requestOptions.betaHeader) {
+          const seen = new Set(profileBetas)
+          const clientBetas = requestOptions.betaHeader
+            .split(',')
+            .map((b) => b.trim())
+            .filter(Boolean)
+          requestConfig.headers['anthropic-beta'] = [
+            ...profileBetas,
+            ...clientBetas.filter((b) => !seen.has(b))
+          ].join(',')
+        } else {
+          requestConfig.headers['anthropic-beta'] = profileBetas.join(',')
+        }
+      } catch (_profileErr) {
+        if (requestOptions.betaHeader) {
+          requestConfig.headers['anthropic-beta'] = requestOptions.betaHeader
+        }
       }
 
       // 发送请求

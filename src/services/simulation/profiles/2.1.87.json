@@ -1,6 +1,6 @@
 {
-  "version": "2.1.88",
-  "user_agent": "claude-cli/2.1.88 (external, cli)",
+  "version": "2.1.87",
+  "user_agent": "claude-cli/2.1.87 (external, cli)",
   "api_version": "2023-06-01",
   "beta_flags": [
     "claude-code-20250219",
@@ -10,11 +10,10 @@
     "context-management-2025-06-27",
     "prompt-caching-scope-2026-01-05",
     "advanced-tool-use-2025-11-20",
+    "structured-outputs-2025-12-15",
     "advisor-tool-2026-03-01",
     "effort-2025-11-24",
-    "task-budgets-2026-03-13",
-    "fast-mode-2026-02-01",
-    "structured-outputs-2025-12-15"
+    "fast-mode-2026-02-01"
   ],
   "fingerprint_salt": "59cf53e54c78",
   "stainless": {

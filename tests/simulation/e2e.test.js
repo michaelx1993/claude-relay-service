@@ -45,21 +45,21 @@ describe('E2E Simulation', () => {
     redis.getClaudeSession.mockResolvedValue({
       session_id: 'session-uuid-v4'
     })
-    redis.getActiveClaudeCodeProfile.mockResolvedValue('2.1.88')
+    redis.getActiveClaudeCodeProfile.mockResolvedValue('2.1.87')
     redis.getClaudeCodeProfile.mockResolvedValue(null)
   })
 
   describe('Fingerprint + Attribution Header', () => {
     it('should compute fingerprint and build correct attribution header', () => {
       const messageText = 'Hello Claude, please help me with this task'
-      const version = '2.1.88'
+      const version = '2.1.87'
       const fingerprint = computeFingerprint(messageText, version)
 
       expect(fingerprint).toMatch(/^[0-9a-f]{3}$/)
 
       const header = buildAttributionHeader(fingerprint, version)
       expect(header).toBe(
-        `x-anthropic-billing-header: cc_version=2.1.88.${fingerprint}; cc_entrypoint=cli;`
+        `x-anthropic-billing-header: cc_version=2.1.87.${fingerprint}; cc_entrypoint=cli;`
       )
     })
   })
@@ -103,9 +103,9 @@ describe('E2E Simulation', () => {
   })
 
   describe('Simulated Headers', () => {
-    it('should build complete headers matching 2.1.88 profile', () => {
+    it('should build complete headers matching 2.1.87 profile', () => {
       const profile = profileService.loadProfileFromFile(
-        require('path').resolve(__dirname, '../../src/services/simulation/profiles/2.1.88.json')
+        require('path').resolve(__dirname, '../../src/services/simulation/profiles/2.1.87.json')
       )
       if (!profile) {
         // Profile file might not exist in test env
@@ -120,7 +120,7 @@ describe('E2E Simulation', () => {
       )
 
       expect(headers['x-app']).toBe('cli')
-      expect(headers['User-Agent']).toContain('claude-cli/2.1.88')
+      expect(headers['User-Agent']).toContain('claude-cli/2.1.87')
       expect(headers['anthropic-version']).toBe('2023-06-01')
       expect(headers['Authorization']).toBe(`Bearer ${ACCESS_TOKEN}`)
       expect(headers['Content-Type']).toBe('application/json')

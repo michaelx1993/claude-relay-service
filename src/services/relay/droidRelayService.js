@@ -1044,8 +1044,17 @@ class DroidRelayService {
       headers['x-api-key'] = 'placeholder'
       headers['x-api-provider'] = 'anthropic'
 
-      if (this._isThinkingRequested(requestBody)) {
-        headers['anthropic-beta'] = 'interleaved-thinking-2025-05-14'
+      // 使用 profile 驱动的 beta header（按模型动态调整）
+      try {
+        const { getModelBetas } = require('../../utils/headerFilter')
+        const profileJson = require('../simulation/profiles/2.1.87.json')
+        headers['anthropic-beta'] = getModelBetas(profileJson.beta_flags, requestBody?.model).join(
+          ','
+        )
+      } catch (_profileErr) {
+        if (this._isThinkingRequested(requestBody)) {
+          headers['anthropic-beta'] = 'interleaved-thinking-2025-05-14'
+        }
       }
     }
 

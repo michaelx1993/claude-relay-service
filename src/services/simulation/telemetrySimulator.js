@@ -1,5 +1,5 @@
 /**
- * Telemetry Simulator — 模拟 Claude Code 2.1.88 遥测事件
+ * Telemetry Simulator — 模拟 Claude Code 2.1.87 遥测事件
  *
  * 构造并发送 ClaudeCodeInternalEvent 格式的遥测事件，
  * 通过 sidecar /telemetry 端点异步发送到 Anthropic 遥测后端。
@@ -41,7 +41,7 @@ function getProfileService() {
 }
 
 /**
- * 构建基础环境元数据（模拟 2.1.88 的 EnvironmentMetadata）
+ * 构建基础环境元数据（模拟 2.1.87 的 EnvironmentMetadata）
  */
 function buildEnvironmentMetadata(version) {
   return {
@@ -76,7 +76,7 @@ async function buildEvent(accountId, eventName, additionalFields = {}) {
   const ps = getProfileService()
 
   const profile = await ps.getActiveProfile()
-  const version = profile?.version || '2.1.88'
+  const version = profile?.version || '2.1.87'
   const deviceId = await dis.getOrCreateDeviceId(accountId)
   const sessionId = await dis.getOrCreateSession(accountId)
 
@@ -126,7 +126,7 @@ async function sendEvents(events, headers) {
  */
 function buildTelemetryHeaders(accessToken, profile) {
   return {
-    'User-Agent': profile?.user_agent || 'claude-cli/2.1.88 (external, cli)',
+    'User-Agent': profile?.user_agent || 'claude-cli/2.1.87 (external, cli)',
     Authorization: `Bearer ${accessToken}`,
     'Content-Type': 'application/json'
   }

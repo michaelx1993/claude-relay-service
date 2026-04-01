@@ -39,7 +39,7 @@ describe('Telemetry Simulator', () => {
     // Mock device & session
     redis.getClaudeDevice.mockResolvedValue({ device_id: 'a'.repeat(64) })
     redis.getClaudeSession.mockResolvedValue({ session_id: 'test-session-id' })
-    redis.getActiveClaudeCodeProfile.mockResolvedValue('2.1.88')
+    redis.getActiveClaudeCodeProfile.mockResolvedValue('2.1.87')
     redis.getClaudeCodeProfile.mockResolvedValue(null)
   })
 

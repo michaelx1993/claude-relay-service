@@ -2,7 +2,7 @@
  * Fingerprint Helper — 首消息指纹计算
  *
  * 算法：SHA256(SALT + msg[4] + msg[7] + msg[20] + version)[:3]
- * 与 2.1.88-src/src/utils/fingerprint.ts 完全一致
+ * 与 2.1.87-src/src/utils/fingerprint.ts 完全一致
  */
 
 const { createHash } = require('crypto')
@@ -35,7 +35,7 @@ function extractFirstMessageText(messages) {
 /**
  * 计算 3 字符指纹
  * @param {string} messageText - 第一条用户消息文本
- * @param {string} version - 版本字符串（如 '2.1.88'）
+ * @param {string} version - 版本字符串（如 '2.1.87'）
  * @returns {string} 3 个十六进制字符
  */
 function computeFingerprint(messageText, version) {

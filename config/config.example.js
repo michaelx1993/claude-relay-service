@@ -206,7 +206,7 @@ const config = {
     sidecarSocketPath:
       process.env.SIDECAR_SOCKET_PATH ||
       `/tmp/bun-relay-${parseInt(process.env.PORT) || 3000}.sock`,
-    profileVersion: process.env.SIMULATION_PROFILE_VERSION || '2.1.88',
+    profileVersion: process.env.SIMULATION_PROFILE_VERSION || '2.1.87',
     sessionRotationHours: parseInt(process.env.SIMULATION_SESSION_ROTATION_HOURS) || 24,
     telemetryEnabled: process.env.SIMULATION_TELEMETRY_ENABLED !== 'false' // 默认跟随 simulation.enabled
   },

@@ -1,7 +1,7 @@
 /**
  * T032: Header 完全匹配验证
  *
- * 构造模拟请求，验证 buildSimulatedHeaders() 输出与 2.1.88-src 的
+ * 构造模拟请求，验证 buildSimulatedHeaders() 输出与 2.1.87-src 的
  * defaultHeaders 构造逐字段对比一致（header 名、值、顺序）
  */
 
@@ -25,14 +25,10 @@ const { buildSimulatedHeaders } = require('../../src/utils/headerFilter')
 
 describe('Header Fidelity', () => {
   const profile = {
-    version: '2.1.88',
-    user_agent: 'claude-cli/2.1.88 (external, cli)',
+    version: '2.1.87',
+    user_agent: 'claude-cli/2.1.87 (external, cli)',
     api_version: '2023-06-01',
-    beta_flags: [
-      'claude-code-20250219',
-      'interleaved-thinking-2025-05-14',
-      'oauth-2025-04-20'
-    ],
+    beta_flags: ['claude-code-20250219', 'interleaved-thinking-2025-05-14', 'oauth-2025-04-20'],
     stainless: {
       lang: 'javascript',
       package_version: '0.39.0',
@@ -61,12 +57,7 @@ describe('Header Fidelity', () => {
 
   describe('buildSimulatedHeaders', () => {
     it('should produce headers in exact profile order', () => {
-      const headers = buildSimulatedHeaders(
-        'account-123',
-        profile,
-        'session-456',
-        'test-token'
-      )
+      const headers = buildSimulatedHeaders('account-123', profile, 'session-456', 'test-token')
 
       const keys = Object.keys(headers)
       expect(keys).toEqual(profile.header_order)
@@ -79,7 +70,7 @@ describe('Header Fidelity', () => {
 
     it('should use profile user_agent', () => {
       const headers = buildSimulatedHeaders('a', profile, 's', 't')
-      expect(headers['User-Agent']).toBe('claude-cli/2.1.88 (external, cli)')
+      expect(headers['User-Agent']).toBe('claude-cli/2.1.87 (external, cli)')
     })
 
     it('should set session ID', () => {
@@ -132,6 +123,24 @@ describe('Header Fidelity', () => {
     it('should have exactly 14 headers matching header_order', () => {
       const headers = buildSimulatedHeaders('a', profile, 's', 't')
       expect(Object.keys(headers)).toHaveLength(14)
+    })
+
+    it('should NOT contain fine-grained-tool-streaming (not a real CLI beta)', () => {
+      const realProfile = require('../../src/services/simulation/profiles/2.1.87.json')
+      const headers = buildSimulatedHeaders('a', realProfile, 's', 't')
+      expect(headers['anthropic-beta']).not.toContain('fine-grained-tool-streaming')
+    })
+
+    it('should NOT contain task-budgets (API rejects it)', () => {
+      const realProfile = require('../../src/services/simulation/profiles/2.1.87.json')
+      const headers = buildSimulatedHeaders('a', realProfile, 's', 't')
+      expect(headers['anthropic-beta']).not.toContain('task-budgets')
+    })
+
+    it('should NOT contain afk-mode (external build does not have it)', () => {
+      const realProfile = require('../../src/services/simulation/profiles/2.1.87.json')
+      const headers = buildSimulatedHeaders('a', realProfile, 's', 't')
+      expect(headers['anthropic-beta']).not.toContain('afk-mode')
     })
   })
 })

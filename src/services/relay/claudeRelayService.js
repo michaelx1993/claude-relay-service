@@ -35,47 +35,11 @@ class ClaudeRelayService {
     this.bodyStore = new Map()
     this._bodyStoreIdCounter = 0
     this.apiVersion = config.claude.apiVersion
-    this.betaHeader = config.claude.betaHeader
     this.systemPrompt = config.claude.systemPrompt
     this.claudeCodeSystemPrompt = "You are Claude Code, Anthropic's official CLI for Claude."
     this.toolNameSuffix = null
     this.toolNameSuffixGeneratedAt = 0
     this.toolNameSuffixTtlMs = 60 * 60 * 1000
-  }
-
-  // 🔧 根据模型ID和客户端传递的 anthropic-beta 获取最终的 header
-  _getBetaHeader(modelId, clientBetaHeader) {
-    const OAUTH_BETA = 'oauth-2025-04-20'
-    const CLAUDE_CODE_BETA = 'claude-code-20250219'
-    const INTERLEAVED_THINKING_BETA = 'interleaved-thinking-2025-05-14'
-    const TOOL_STREAMING_BETA = 'fine-grained-tool-streaming-2025-05-14'
-
-    const isHaikuModel = modelId && modelId.toLowerCase().includes('haiku')
-    const baseBetas = isHaikuModel
-      ? [OAUTH_BETA, INTERLEAVED_THINKING_BETA]
-      : [CLAUDE_CODE_BETA, OAUTH_BETA, INTERLEAVED_THINKING_BETA, TOOL_STREAMING_BETA]
-
-    const betaList = []
-    const seen = new Set()
-    const addBeta = (beta) => {
-      if (!beta || seen.has(beta)) {
-        return
-      }
-      seen.add(beta)
-      betaList.push(beta)
-    }
-
-    baseBetas.forEach(addBeta)
-
-    if (clientBetaHeader) {
-      clientBetaHeader
-        .split(',')
-        .map((p) => p.trim())
-        .filter(Boolean)
-        .forEach(addBeta)
-    }
-
-    return betaList.join(',')
   }
 
   _buildStandardRateLimitMessage(resetTime) {
@@ -1181,7 +1145,7 @@ class ClaudeRelayService {
       delete processedBody.top_p
     }
 
-    // 🎭 thinking 启用时不发送 temperature（与 CLI 2.1.88 一致）
+    // 🎭 thinking 启用时不发送 temperature（与 CLI 2.1.87 一致）
     // CLI: const temperature = !hasThinking ? (options.temperatureOverride ?? 1) : undefined
     if (processedBody.thinking && processedBody.thinking.type) {
       delete processedBody.temperature
@@ -1532,7 +1496,7 @@ class ClaudeRelayService {
       const profileService = require('../simulation/profileService')
 
       const profile = await profileService.getActiveProfile()
-      const version = profile?.version || '2.1.88'
+      const version = profile?.version || '2.1.87'
 
       // 计算首消息指纹并注入 attribution header 到 system prompt
       const fingerprint = fingerprintHelper.computeFingerprintFromMessages(
@@ -1750,8 +1714,7 @@ class ClaudeRelayService {
 
         // 检测响应中的 tool_use 内容块，发送 tengu_tool_use_success 遥测
         try {
-          const parsed =
-            typeof responseBody === 'string' ? JSON.parse(responseBody) : responseBody
+          const parsed = typeof responseBody === 'string' ? JSON.parse(responseBody) : responseBody
           if (parsed?.content && Array.isArray(parsed.content)) {
             for (const block of parsed.content) {
               if (block?.type === 'tool_use' && block.name) {
@@ -2113,8 +2076,7 @@ class ClaudeRelayService {
       // 🎭 通过 sidecar Unix socket 转发（Bun BoringSSL TLS 指纹）
       const http = require('http')
       const socketPath =
-        config.simulation?.sidecarSocketPath ||
-        `/tmp/bun-relay-${config.server?.port || 3000}.sock`
+        config.simulation?.sidecarSocketPath || `/tmp/bun-relay-${config.server?.port || 3000}.sock`
       const targetUrl = `https://${url.hostname}${url.pathname}${url.search || ''}`
 
       // 获取账户代理配置（动态 per-account SOCKS5/HTTP proxy）

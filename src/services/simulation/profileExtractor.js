@@ -16,7 +16,7 @@ const logger = require('../../utils/logger')
 
 /**
  * 从源码目录提取 profile 配置
- * @param {string} srcPath - 源码根目录（如 /path/to/2.1.88-src）
+ * @param {string} srcPath - 源码根目录（如 /path/to/2.1.87-src）
  * @returns {object|null} profile JSON
  */
 function extractProfileFromSource(srcPath) {

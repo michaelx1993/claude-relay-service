@@ -1,14 +1,14 @@
 /**
- * CLI 一致性测试 — 验证每一处模拟实现都与 2.1.88-src 源码完全一致
+ * CLI 一致性测试 — 验证每一处模拟实现都与 2.1.87-src 源码完全一致
  *
  * 对照源码文件：
- * - 2.1.88-src/src/utils/fingerprint.ts     → fingerprintHelper.js
- * - 2.1.88-src/src/utils/config.ts           → deviceIdentityService.js
- * - 2.1.88-src/src/services/api/claude.ts    → deviceIdentityService.js (buildMetadataUserId)
- * - 2.1.88-src/src/constants/system.ts       → fingerprintHelper.js (buildAttributionHeader)
- * - 2.1.88-src/src/services/api/client.ts    → headerFilter.js (buildSimulatedHeaders)
- * - 2.1.88-src/src/utils/http.ts             → profiles/2.1.88.json (user_agent)
- * - 2.1.88-src/src/utils/betas.ts            → profiles/2.1.88.json (beta_flags)
+ * - 2.1.87-src/src/utils/fingerprint.ts     → fingerprintHelper.js
+ * - 2.1.87-src/src/utils/config.ts           → deviceIdentityService.js
+ * - 2.1.87-src/src/services/api/claude.ts    → deviceIdentityService.js (buildMetadataUserId)
+ * - 2.1.87-src/src/constants/system.ts       → fingerprintHelper.js (buildAttributionHeader)
+ * - 2.1.87-src/src/services/api/client.ts    → headerFilter.js (buildSimulatedHeaders)
+ * - 2.1.87-src/src/utils/http.ts             → profiles/2.1.87.json (user_agent)
+ * - 2.1.87-src/src/utils/betas.ts            → profiles/2.1.87.json (beta_flags)
  */
 
 const { createHash } = require('crypto')
@@ -40,12 +40,16 @@ const {
   buildAttributionHeader
 } = require('../../src/utils/fingerprintHelper')
 const deviceIdentityService = require('../../src/utils/deviceIdentityService')
-const { buildSimulatedHeaders, getModelBetas } = require('../../src/utils/headerFilter')
+const {
+  buildSimulatedHeaders,
+  getModelBetas,
+  buildBetaHeader
+} = require('../../src/utils/headerFilter')
 const redis = require('../../src/models/redis')
 const path = require('path')
 
 // ---------------------------------------------------------------------------
-// 真实 CLI 2.1.88-src 中的常量（用于对照验证）
+// 真实 CLI 2.1.87-src 中的常量（用于对照验证）
 // ---------------------------------------------------------------------------
 const CLI_FINGERPRINT_SALT = '59cf53e54c78'
 const CLI_FINGERPRINT_INDICES = [4, 7, 20]
@@ -56,7 +60,7 @@ const CLI_X_APP = 'cli'
 const CLI_STAINLESS_LANG = 'js' // @anthropic-ai/sdk 使用 'js'
 const CLI_STAINLESS_RUNTIME = 'bun' // CLI 由 bun 打包运行
 
-// 2.1.88-src/src/constants/betas.ts 中定义的所有 beta header 常量
+// 2.1.87-src/src/constants/betas.ts 中定义的所有 beta header 常量
 const CLI_ALL_KNOWN_BETAS = [
   'claude-code-20250219',
   'interleaved-thinking-2025-05-14',
@@ -95,12 +99,12 @@ describe('CLI Conformance Tests', () => {
     jest.clearAllMocks()
     redis.getClaudeDevice.mockResolvedValue({ device_id: 'a'.repeat(64) })
     redis.getClaudeSession.mockResolvedValue({ session_id: 'test-session-uuid' })
-    redis.getActiveClaudeCodeProfile.mockResolvedValue('2.1.88')
+    redis.getActiveClaudeCodeProfile.mockResolvedValue('2.1.87')
     redis.getClaudeCodeProfile.mockResolvedValue(null)
   })
 
   // =========================================================================
-  // 1. 指纹算法一致性（对照 2.1.88-src/src/utils/fingerprint.ts）
+  // 1. 指纹算法一致性（对照 2.1.87-src/src/utils/fingerprint.ts）
   // =========================================================================
   describe('Fingerprint Algorithm (vs fingerprint.ts)', () => {
     it('should use exact same salt as CLI source: 59cf53e54c78', () => {
@@ -116,7 +120,7 @@ describe('CLI Conformance Tests', () => {
       expect(msg[20]).toBe(' ')
 
       // 验证我们的实现产生相同结果
-      const version = '2.1.88'
+      const version = '2.1.87'
       const expectedInput = `${CLI_FINGERPRINT_SALT}ol ${version}`
       const expectedHash = createHash('sha256').update(expectedInput).digest('hex')
       const expectedFingerprint = expectedHash.slice(0, 3)
@@ -127,7 +131,7 @@ describe('CLI Conformance Tests', () => {
     it('should use "0" for out-of-bounds indices (matching CLI)', () => {
       // CLI: messageText[i] || '0'
       const shortMsg = 'Hi' // length=2, indices 4,7,20 all out of bounds
-      const version = '2.1.88'
+      const version = '2.1.87'
       const expectedInput = `${CLI_FINGERPRINT_SALT}000${version}`
       const expectedHash = createHash('sha256').update(expectedInput).digest('hex')
       const expectedFingerprint = expectedHash.slice(0, 3)
@@ -136,14 +140,14 @@ describe('CLI Conformance Tests', () => {
     })
 
     it('should return exactly 3 hex characters', () => {
-      const fingerprint = computeFingerprint('test message for fingerprint', '2.1.88')
+      const fingerprint = computeFingerprint('test message for fingerprint', '2.1.87')
       expect(fingerprint).toMatch(/^[0-9a-f]{3}$/)
       expect(fingerprint).toHaveLength(3)
     })
 
     it('should use SHA256 hash (not MD5 or other)', () => {
       const msg = 'Hello Claude'
-      const version = '2.1.88'
+      const version = '2.1.87'
       const chars = CLI_FINGERPRINT_INDICES.map((i) => msg[i] || '0').join('')
       const input = `${CLI_FINGERPRINT_SALT}${chars}${version}`
 
@@ -160,20 +164,20 @@ describe('CLI Conformance Tests', () => {
     })
 
     it('should produce deterministic output for same input', () => {
-      const fp1 = computeFingerprint('same message', '2.1.88')
-      const fp2 = computeFingerprint('same message', '2.1.88')
+      const fp1 = computeFingerprint('same message', '2.1.87')
+      const fp2 = computeFingerprint('same message', '2.1.87')
       expect(fp1).toBe(fp2)
     })
 
     it('should produce different output for different messages', () => {
       // 确保两个消息在 indices [4,7,20] 处字符不同
-      const fp1 = computeFingerprint('AAAABBBCCCCDDDDEEEEFFFFF', '2.1.88') // [4]=B [7]=C [20]=F
-      const fp2 = computeFingerprint('XXXXYYYYZZZZWWWWVVVVUUUUU', '2.1.88') // [4]=Y [7]=Z [20]=U
+      const fp1 = computeFingerprint('AAAABBBCCCCDDDDEEEEFFFFF', '2.1.87') // [4]=B [7]=C [20]=F
+      const fp2 = computeFingerprint('XXXXYYYYZZZZWWWWVVVVUUUUU', '2.1.87') // [4]=Y [7]=Z [20]=U
       expect(fp1).not.toBe(fp2)
     })
 
     it('should handle empty string same as CLI (all indices use "0")', () => {
-      const version = '2.1.88'
+      const version = '2.1.87'
       const expectedInput = `${CLI_FINGERPRINT_SALT}000${version}`
       const expected = createHash('sha256').update(expectedInput).digest('hex').slice(0, 3)
       expect(computeFingerprint('', version)).toBe(expected)
@@ -231,14 +235,9 @@ describe('CLI Conformance Tests', () => {
   // =========================================================================
   describe('computeFingerprintFromMessages', () => {
     it('should compute fingerprint from messages array end-to-end', () => {
-      const messages = [
-        { role: 'user', content: 'Hello Claude, please help me with this task' }
-      ]
-      const fp = computeFingerprintFromMessages(messages, '2.1.88')
-      const directFp = computeFingerprint(
-        'Hello Claude, please help me with this task',
-        '2.1.88'
-      )
+      const messages = [{ role: 'user', content: 'Hello Claude, please help me with this task' }]
+      const fp = computeFingerprintFromMessages(messages, '2.1.87')
+      const directFp = computeFingerprint('Hello Claude, please help me with this task', '2.1.87')
       expect(fp).toBe(directFp)
     })
   })
@@ -248,26 +247,24 @@ describe('CLI Conformance Tests', () => {
   // =========================================================================
   describe('Attribution Header Format (vs system.ts)', () => {
     it('should match CLI format: cc_version={version}.{fp}; cc_entrypoint=cli;', () => {
-      const header = buildAttributionHeader('a1f', '2.1.88')
-      expect(header).toBe(
-        'x-anthropic-billing-header: cc_version=2.1.88.a1f; cc_entrypoint=cli;'
-      )
+      const header = buildAttributionHeader('a1f', '2.1.87')
+      expect(header).toBe('x-anthropic-billing-header: cc_version=2.1.87.a1f; cc_entrypoint=cli;')
     })
 
     it('should use "cli" as entrypoint (matching process.env.CLAUDE_CODE_ENTRYPOINT default)', () => {
-      const header = buildAttributionHeader('000', '2.1.88')
+      const header = buildAttributionHeader('000', '2.1.87')
       expect(header).toContain('cc_entrypoint=cli;')
     })
 
     it('should embed fingerprint after version with dot separator', () => {
-      const header = buildAttributionHeader('abc', '2.1.88')
-      expect(header).toContain('cc_version=2.1.88.abc;')
+      const header = buildAttributionHeader('abc', '2.1.87')
+      expect(header).toContain('cc_version=2.1.87.abc;')
     })
 
     it('should NOT include cch= (NATIVE_CLIENT_ATTESTATION is build-time feature flag)', () => {
       // cch=00000 只在 NATIVE_CLIENT_ATTESTATION 启用时才出现
       // 外部用户不会有这个字段
-      const header = buildAttributionHeader('abc', '2.1.88')
+      const header = buildAttributionHeader('abc', '2.1.87')
       expect(header).not.toContain('cch=')
     })
   })
@@ -339,9 +336,7 @@ describe('CLI Conformance Tests', () => {
       redis.getClaudeSession.mockResolvedValue(null)
       return deviceIdentityService.getOrCreateSession('test-account').then((sid) => {
         // UUID v4: xxxxxxxx-xxxx-4xxx-[89ab]xxx-xxxxxxxxxxxx
-        expect(sid).toMatch(
-          /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
-        )
+        expect(sid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
       })
     })
 
@@ -392,19 +387,19 @@ describe('CLI Conformance Tests', () => {
   })
 
   // =========================================================================
-  // 8. Profile 2.1.88 字段验证（对照 CLI 各源码文件）
+  // 8. Profile 2.1.87 字段验证（对照 CLI 各源码文件）
   // =========================================================================
-  describe('Profile 2.1.88 Fields', () => {
-    const profile = require('../../src/services/simulation/profiles/2.1.88.json')
+  describe('Profile 2.1.87 Fields', () => {
+    const profile = require('../../src/services/simulation/profiles/2.1.87.json')
 
     it('should have version matching target', () => {
-      expect(profile.version).toBe('2.1.88')
+      expect(profile.version).toBe('2.1.87')
     })
 
     // 对照 http.ts getUserAgent()
     // 格式: claude-cli/{VERSION} ({USER_TYPE}, {ENTRYPOINT})
     it('should have user_agent matching CLI getUserAgent() format', () => {
-      expect(profile.user_agent).toBe('claude-cli/2.1.88 (external, cli)')
+      expect(profile.user_agent).toBe('claude-cli/2.1.87 (external, cli)')
       // external = OAuth 用户类型
       // cli = 默认 entrypoint
     })
@@ -469,8 +464,8 @@ describe('CLI Conformance Tests', () => {
         expect(profile.beta_flags).toContain('effort-2025-11-24')
       })
 
-      it('should contain task-budgets beta', () => {
-        expect(profile.beta_flags).toContain('task-budgets-2026-03-13')
+      it('should NOT contain task-budgets beta (API rejects it)', () => {
+        expect(profile.beta_flags).not.toContain('task-budgets-2026-03-13')
       })
 
       it('should contain fast-mode beta', () => {
@@ -566,7 +561,7 @@ describe('CLI Conformance Tests', () => {
   // 9. buildSimulatedHeaders 输出验证（对照 client.ts getAnthropicClient）
   // =========================================================================
   describe('buildSimulatedHeaders Output (vs client.ts)', () => {
-    const profile = require('../../src/services/simulation/profiles/2.1.88.json')
+    const profile = require('../../src/services/simulation/profiles/2.1.87.json')
     const SESSION_ID = 'session-uuid-v4'
     const TOKEN = 'test-oauth-token'
 
@@ -581,8 +576,8 @@ describe('CLI Conformance Tests', () => {
     })
 
     // 对照 http.ts getUserAgent()
-    it('should set User-Agent = "claude-cli/2.1.88 (external, cli)"', () => {
-      expect(headers['User-Agent']).toBe('claude-cli/2.1.88 (external, cli)')
+    it('should set User-Agent = "claude-cli/2.1.87 (external, cli)"', () => {
+      expect(headers['User-Agent']).toBe('claude-cli/2.1.87 (external, cli)')
     })
 
     // 对照 client.ts: 'X-Claude-Code-Session-Id': getSessionId()
@@ -671,7 +666,7 @@ describe('CLI Conformance Tests', () => {
   describe('Cross-Algorithm Consistency', () => {
     it('should produce consistent fingerprint→attribution pipeline', () => {
       const msg = 'Can you help me write a function to sort an array?'
-      const version = '2.1.88'
+      const version = '2.1.87'
 
       const fp = computeFingerprint(msg, version)
       const header = buildAttributionHeader(fp, version)
@@ -685,7 +680,7 @@ describe('CLI Conformance Tests', () => {
       const messages = [
         { role: 'user', content: 'Can you help me write a function to sort an array?' }
       ]
-      const version = '2.1.88'
+      const version = '2.1.87'
 
       const fpFromMessages = computeFingerprintFromMessages(messages, version)
       const fpDirect = computeFingerprint(messages[0].content, version)
@@ -700,24 +695,24 @@ describe('CLI Conformance Tests', () => {
   describe('Edge Cases & Safety', () => {
     it('should handle unicode messages in fingerprint', () => {
       const msg = '你好 Claude，请帮我写一个排序函数'
-      const fp = computeFingerprint(msg, '2.1.88')
+      const fp = computeFingerprint(msg, '2.1.87')
       expect(fp).toMatch(/^[0-9a-f]{3}$/)
     })
 
     it('should handle extremely long messages', () => {
       const msg = 'x'.repeat(100000)
-      const fp = computeFingerprint(msg, '2.1.88')
+      const fp = computeFingerprint(msg, '2.1.87')
       expect(fp).toMatch(/^[0-9a-f]{3}$/)
     })
 
     it('should handle single character message', () => {
       const msg = 'a'
-      const fp = computeFingerprint(msg, '2.1.88')
+      const fp = computeFingerprint(msg, '2.1.87')
       expect(fp).toMatch(/^[0-9a-f]{3}$/)
     })
 
     it('should not leak token in headers (no x-api-key)', () => {
-      const profile = require('../../src/services/simulation/profiles/2.1.88.json')
+      const profile = require('../../src/services/simulation/profiles/2.1.87.json')
       const headers = buildSimulatedHeaders('acc', profile, 'sess', 'secret-token')
       // Token 只应该出现在 Authorization header 中
       const headerStr = JSON.stringify(headers)
@@ -730,11 +725,11 @@ describe('CLI Conformance Tests', () => {
   // 12. 动态 Beta Headers（对照 betas.ts getAllModelBetas）
   // =========================================================================
   describe('Dynamic Model Betas (vs betas.ts getAllModelBetas)', () => {
-    const profile = require('../../src/services/simulation/profiles/2.1.88.json')
+    const profile = require('../../src/services/simulation/profiles/2.1.87.json')
 
-    it('should exclude claude-code-20250219 for haiku models', () => {
+    it('should include claude-code-20250219 for haiku models (relay requests are agentic)', () => {
       const betas = getModelBetas(profile.beta_flags, 'claude-haiku-4-5-20251001')
-      expect(betas).not.toContain('claude-code-20250219')
+      expect(betas).toContain('claude-code-20250219')
     })
 
     it('should include claude-code-20250219 for sonnet models', () => {
@@ -747,14 +742,44 @@ describe('CLI Conformance Tests', () => {
       expect(betas).toContain('claude-code-20250219')
     })
 
-    it('should exclude structured-outputs for haiku', () => {
+    it('should include structured-outputs for haiku 4.5 (supported model)', () => {
       const betas = getModelBetas(profile.beta_flags, 'claude-haiku-4-5-20251001')
+      expect(betas).toContain('structured-outputs-2025-12-15')
+    })
+
+    it('should include structured-outputs for sonnet 4.6', () => {
+      const betas = getModelBetas(profile.beta_flags, 'claude-sonnet-4-6-20250514')
+      expect(betas).toContain('structured-outputs-2025-12-15')
+    })
+
+    it('should include structured-outputs for opus 4.6', () => {
+      const betas = getModelBetas(profile.beta_flags, 'claude-opus-4-6-20250514')
+      expect(betas).toContain('structured-outputs-2025-12-15')
+    })
+
+    it('should exclude structured-outputs for unsupported models', () => {
+      const betas = getModelBetas(profile.beta_flags, 'claude-sonnet-4-20250514')
       expect(betas).not.toContain('structured-outputs-2025-12-15')
     })
 
-    it('should include structured-outputs for sonnet/opus', () => {
-      const betas = getModelBetas(profile.beta_flags, 'claude-sonnet-4-20250514')
-      expect(betas).toContain('structured-outputs-2025-12-15')
+    it('should exclude ISP betas for claude-3 models', () => {
+      const betas = getModelBetas(profile.beta_flags, 'claude-3-opus-20240229')
+      expect(betas).not.toContain('interleaved-thinking-2025-05-14')
+      expect(betas).not.toContain('redact-thinking-2026-02-12')
+      expect(betas).not.toContain('context-management-2025-06-27')
+    })
+
+    it('should include ISP betas for claude-4 models', () => {
+      const betas = getModelBetas(profile.beta_flags, 'claude-opus-4-6-20250514')
+      expect(betas).toContain('interleaved-thinking-2025-05-14')
+      expect(betas).toContain('redact-thinking-2026-02-12')
+      expect(betas).toContain('context-management-2025-06-27')
+    })
+
+    it('should include full beta list for unknown models', () => {
+      const betas = getModelBetas(profile.beta_flags, 'some-unknown-model')
+      expect(betas).toContain('claude-code-20250219')
+      expect(betas).toContain('interleaved-thinking-2025-05-14')
     })
 
     it('should always include oauth beta regardless of model', () => {
@@ -774,13 +799,15 @@ describe('CLI Conformance Tests', () => {
       expect(result).toBe('some-string')
     })
 
-    it('should build headers with model-specific betas for haiku', () => {
+    it('should build headers with agentic betas for haiku (includes claude-code)', () => {
       const headers = buildSimulatedHeaders('acc', profile, 'sess', 'tok', {
         model: 'claude-haiku-4-5-20251001'
       })
       const betaStr = headers['anthropic-beta']
-      expect(betaStr).not.toContain('claude-code-20250219')
+      expect(betaStr).toContain('claude-code-20250219')
       expect(betaStr).toContain('oauth-2025-04-20')
+      // haiku 4.5 supports structured-outputs per CLI modelSupportsStructuredOutputs()
+      expect(betaStr).toContain('structured-outputs-2025-12-15')
     })
 
     it('should build headers with full betas for sonnet', () => {
@@ -790,6 +817,47 @@ describe('CLI Conformance Tests', () => {
       const betaStr = headers['anthropic-beta']
       expect(betaStr).toContain('claude-code-20250219')
       expect(betaStr).toContain('oauth-2025-04-20')
+    })
+  })
+
+  // =========================================================================
+  // 13. buildBetaHeader 公共函数测试
+  // =========================================================================
+  describe('buildBetaHeader (profile-driven beta construction)', () => {
+    beforeEach(() => {
+      redis.getActiveClaudeCodeProfile.mockResolvedValue(null)
+      redis.getClaudeCodeProfile.mockResolvedValue(null)
+      redis.setActiveClaudeCodeProfile.mockResolvedValue(undefined)
+      redis.setClaudeCodeProfile.mockResolvedValue(undefined)
+    })
+
+    it('should return profile betas for opus model without client beta', async () => {
+      const result = await buildBetaHeader('claude-opus-4-6-20250514')
+      expect(result).toContain('claude-code-20250219')
+      expect(result).toContain('oauth-2025-04-20')
+      expect(result).toContain('interleaved-thinking-2025-05-14')
+      expect(result).not.toContain('task-budgets')
+      expect(result).not.toContain('fine-grained-tool-streaming')
+    })
+
+    it('should merge client betas with deduplication', async () => {
+      const result = await buildBetaHeader(
+        'claude-opus-4-6-20250514',
+        'oauth-2025-04-20,custom-beta-123'
+      )
+      // oauth should not be duplicated
+      const parts = result.split(',')
+      const oauthCount = parts.filter((b) => b.trim() === 'oauth-2025-04-20').length
+      expect(oauthCount).toBe(1)
+      // custom beta should be appended
+      expect(result).toContain('custom-beta-123')
+    })
+
+    it('should apply model filtering for claude-3', async () => {
+      const result = await buildBetaHeader('claude-3-opus-20240229')
+      expect(result).not.toContain('interleaved-thinking-2025-05-14')
+      expect(result).not.toContain('redact-thinking-2026-02-12')
+      expect(result).not.toContain('context-management-2025-06-27')
     })
   })
 })

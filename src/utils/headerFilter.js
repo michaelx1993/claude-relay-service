@@ -116,24 +116,39 @@ function filterForGemini(headers) {
 
 /**
  * 根据模型动态调整 beta flags
- * 与 2.1.88-src/src/utils/betas.ts getAllModelBetas() 一致：
- * - haiku 不带 claude-code-20250219
- * - 非 ISP 模型不带 interleaved-thinking / redact-thinking
- * - structured-outputs 仅 sonnet/opus 且需 experiment
+ * 基于 2.1.87-src/src/utils/betas.ts getAllModelBetas() + getMergedBetas()
+ *
+ * relay 所有请求均为 agentic（用户对话转发），因此：
+ * - 所有模型（含 Haiku）都包含 claude-code-20250219（对应 isAgenticQuery: true）
+ * - claude-3-* 模型排除 ISP 相关 beta（不支持 interleaved thinking）
+ * - structured-outputs 仅对支持的模型启用
  */
 function getModelBetas(profileBetas, modelId) {
   if (!Array.isArray(profileBetas)) return profileBetas
 
   const model = (modelId || '').toLowerCase()
-  const isHaiku = model.includes('haiku')
+  let betas = [...profileBetas]
 
-  // haiku: 排除 claude-code beta（CLI 源码: 仅非 haiku 添加）
-  let betas = isHaiku
-    ? profileBetas.filter((b) => b !== 'claude-code-20250219')
-    : [...profileBetas]
+  // claude-3-*: 排除 ISP 相关 beta（modelSupportsISP / modelSupportsContextManagement）
+  if (model.includes('claude-3-')) {
+    const ispBetas = [
+      'interleaved-thinking-2025-05-14',
+      'redact-thinking-2026-02-12',
+      'context-management-2025-06-27'
+    ]
+    betas = betas.filter((b) => !ispBetas.includes(b))
+  }
 
-  // structured-outputs: 仅对 sonnet/opus 启用，haiku 不支持
-  if (isHaiku) {
+  // structured-outputs: 仅对特定模型启用（modelSupportsStructuredOutputs）
+  const supportsStructuredOutputs = [
+    'claude-sonnet-4-6',
+    'claude-sonnet-4-5',
+    'claude-opus-4-1',
+    'claude-opus-4-5',
+    'claude-opus-4-6',
+    'claude-haiku-4-5'
+  ].some((m) => model.includes(m))
+  if (!supportsStructuredOutputs) {
     betas = betas.filter((b) => b !== 'structured-outputs-2025-12-15')
   }
 
@@ -189,11 +204,35 @@ function buildSimulatedHeaders(accountId, profile, sessionId, token, options = {
   return headers
 }
 
+/**
+ * 构建 anthropic-beta header 值
+ * 从 profile 加载基准 beta 列表，按模型过滤，合并客户端自定义 beta（去重）
+ *
+ * @param {string} modelId - 模型 ID
+ * @param {string} [clientBetaHeader] - 客户端传来的 beta header（逗号分隔，可选）
+ * @returns {Promise<string>} 最终的 beta header 值
+ */
+async function buildBetaHeader(modelId, clientBetaHeader) {
+  const profileService = require('../services/simulation/profileService')
+  const profile = await profileService.getActiveProfile()
+  const profileBetas = getModelBetas(profile?.beta_flags || [], modelId)
+
+  if (!clientBetaHeader) return profileBetas.join(',')
+
+  const seen = new Set(profileBetas)
+  const clientBetas = clientBetaHeader
+    .split(',')
+    .map((b) => b.trim())
+    .filter(Boolean)
+  return [...profileBetas, ...clientBetas.filter((b) => !seen.has(b))].join(',')
+}
+
 module.exports = {
   cdnHeaders,
   filterForOpenAI,
   filterForClaude,
   filterForGemini,
   buildSimulatedHeaders,
-  getModelBetas
+  getModelBetas,
+  buildBetaHeader
 }

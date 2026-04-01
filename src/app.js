@@ -166,10 +166,10 @@ class Application {
         logger.error('❌ Failed to start Bun sidecar:', error.message)
       }
 
-      // 🎭 初始化模拟 Profile 版本（显式指定 2.1.88）
+      // 🎭 初始化模拟 Profile 版本（显式指定 2.1.87）
       try {
         const profileService = require('./services/simulation/profileService')
-        const simulationVersion = config.simulation?.profileVersion || '2.1.88'
+        const simulationVersion = config.simulation?.profileVersion || '2.1.87'
         await profileService.setActiveProfile(simulationVersion)
         logger.info(`🎭 Simulation profile initialized: ${simulationVersion}`)
       } catch (error) {

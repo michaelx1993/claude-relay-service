@@ -4,7 +4,7 @@
  * 提供 per-account 的 device_id 持久化、session_id 轮换、
  * 以及 metadata.user_id JSON 构建。
  *
- * 与 2.1.88-src/src/services/api/claude.ts getAPIMetadata() 一致：
+ * 与 2.1.87-src/src/services/api/claude.ts getAPIMetadata() 一致：
  * metadata.user_id = JSON.stringify({ device_id, account_uuid, session_id })
  */
 
@@ -22,7 +22,7 @@ function getRedis() {
 
 /**
  * 获取或创建设备 ID（per-account 持久化，无 TTL）
- * 与 2.1.88-src/src/utils/config.ts getOrCreateUserID() 完全一致：
+ * 与 2.1.87-src/src/utils/config.ts getOrCreateUserID() 完全一致：
  * randomBytes(32).toString('hex') = 64 个十六进制字符
  *
  * @param {string} accountId
@@ -92,7 +92,7 @@ async function getOrCreateSession(accountId) {
 
 /**
  * 构建 metadata.user_id JSON 字符串
- * 与 2.1.88-src getAPIMetadata() 完全一致：
+ * 与 2.1.87-src getAPIMetadata() 完全一致：
  * JSON.stringify({ device_id, account_uuid, session_id })
  *
  * @param {string} accountId - 用作 account_uuid

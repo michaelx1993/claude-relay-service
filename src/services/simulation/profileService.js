@@ -38,10 +38,10 @@ async function getActiveProfile() {
   }
 
   if (!activeVersion) {
-    // 没有设置活跃 profile，使用默认的 2.1.88
-    const defaultProfile = loadProfileFromFile(path.join(PROFILES_DIR, '2.1.88.json'))
+    // 没有设置活跃 profile，使用默认的 2.1.87
+    const defaultProfile = loadProfileFromFile(path.join(PROFILES_DIR, '2.1.87.json'))
     if (defaultProfile) {
-      await setActiveProfile('2.1.88')
+      await setActiveProfile('2.1.87')
       return defaultProfile
     }
     return null
