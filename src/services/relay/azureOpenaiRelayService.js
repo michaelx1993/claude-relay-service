@@ -247,7 +247,7 @@ class StreamManager {
           cleanup()
         }
       } catch (error) {
-        logger.warn(`Stream cleanup error for ${streamId}:`, error.message)
+        logger.warn(`Stream cleanup error for ${streamId}: ${error.message}`)
       } finally {
         this.activeStreams.delete(streamId)
         this.cleanupCallbacks.delete(streamId)

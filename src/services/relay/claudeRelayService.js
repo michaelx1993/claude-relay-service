@@ -2600,7 +2600,7 @@ class ClaudeRelayService {
         if (upstreamEncoding === 'gzip') {
           dataSource = res.pipe(zlib.createGunzip())
           dataSource.on('error', (err) => {
-            logger.error('❌ Gzip decompression error in stream:', err.message)
+            logger.error(`❌ Gzip decompression error in stream: ${err.message}`)
             if (isStreamWritable(responseStream)) {
               responseStream.end()
             }
@@ -2608,7 +2608,7 @@ class ClaudeRelayService {
         } else if (upstreamEncoding === 'deflate') {
           dataSource = res.pipe(zlib.createInflate())
           dataSource.on('error', (err) => {
-            logger.error('❌ Deflate decompression error in stream:', err.message)
+            logger.error(`❌ Deflate decompression error in stream: ${err.message}`)
             if (isStreamWritable(responseStream)) {
               responseStream.end()
             }
@@ -3522,7 +3522,7 @@ class ClaudeRelayService {
       }
     } catch (error) {
       const latencyMs = Date.now() - startTime
-      logger.error(`❌ Test account connection (sync) failed:`, error.message)
+      logger.error(`❌ Test account connection (sync) failed: ${error.message || error}`)
 
       // 提取错误详情
       let errorMessage = error.message

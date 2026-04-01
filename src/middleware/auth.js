@@ -90,7 +90,7 @@ async function shouldRejectDueToOverload(apiKeyId, timeoutMs, queueConfig, maxQu
     return { reject: false, p90: stats.p90, sampleCount: stats.sampleCount, currentQueueCount }
   } catch (error) {
     // 健康检查出错时不阻塞请求，记录警告并继续
-    logger.warn(`Health check failed for ${apiKeyId}:`, error.message)
+    logger.warn(`Health check failed for ${apiKeyId}: ${error.message}`)
     return { reject: false, reason: 'health_check_error', error: error.message }
   }
 }

@@ -241,6 +241,18 @@ class AccountTestSchedulerService {
         logger.warn(
           `❌ Scheduled test failed for ${platform} account ${accountId}: ${testResult.error}`
         )
+
+        // 如果账户不存在，自动停止该账户的定时测试任务，避免持续报错
+        if (testResult.error === 'Account not found') {
+          const taskInfo = this.scheduledTasks.get(accountKey)
+          if (taskInfo) {
+            taskInfo.task.stop()
+            this.scheduledTasks.delete(accountKey)
+            logger.warn(
+              `🛑 Auto-removed cron task for ${accountKey}: account no longer exists`
+            )
+          }
+        }
       }
 
       return testResult

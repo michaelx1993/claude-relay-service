@@ -2320,7 +2320,7 @@ class ClaudeAccountService {
           `⚠️ Profile API returned 403 for account ${accountId} - insufficient permissions`
         )
       } else {
-        logger.error(`❌ Failed to fetch profile for account ${accountId}:`, error.message)
+        logger.error(`❌ Failed to fetch profile for account ${accountId}: ${error.message}`)
       }
       throw error
     }
