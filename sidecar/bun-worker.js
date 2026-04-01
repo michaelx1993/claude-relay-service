@@ -150,9 +150,15 @@ async function handleProxy(req) {
     clearTimeout(timeoutId)
 
     // 收集上游 response headers
+    // 注意：Bun fetch 会自动解压 gzip/deflate/br 响应体，
+    // 因此必须移除 content-encoding 和 transfer-encoding，
+    // 否则 Node.js 端会尝试二次解压已经是明文的数据，导致 "incorrect header check" 错误
     const upstreamHeaders = {}
+    const skipHeaders = new Set(['content-encoding', 'transfer-encoding', 'content-length'])
     upstreamRes.headers.forEach((value, key) => {
-      upstreamHeaders[key] = value
+      if (!skipHeaders.has(key.toLowerCase())) {
+        upstreamHeaders[key] = value
+      }
     })
     const encodedHeaders = Buffer.from(JSON.stringify(upstreamHeaders)).toString('base64')
 
